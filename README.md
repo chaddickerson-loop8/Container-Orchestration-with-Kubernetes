@@ -3,6 +3,19 @@
 
 ---
 
+## Summary
+
+A hands-on learning repo that works through the **24-module Kubernetes section** of the TechWorld with Nana DevOps Bootcamp. Every module's commands, YAML manifests, applied output, and key takeaways live in this single README so the file doubles as a learning log and a personal reference guide.
+
+- **Cluster:** local Minikube (Docker driver, K8s `v1.35.1`) on WSL2 / Ubuntu 24.04
+- **Manifests:** all YAML lives in [`K8S-Config-Files/`](./K8S-Config-Files) and is applied with `kubectl apply -f`
+- **Pattern per module:** intro → commands → output → key learnings → **Summary** → **Conclusion**
+- **Goal:** by Module 24, be able to deploy, expose, configure, secure, and operate microservices on Kubernetes — locally and in production-style setups (Helm, Helmfile, RBAC, Operators)
+
+Jump to the [Progress Tracker](#progress-tracker) below to see which modules are complete.
+
+---
+
 ## Project Structure
 ```
 .
@@ -867,4 +880,20 @@ This module wires together **every major K8s primitive** in one working flow: Se
 | Operator Hub | https://operatorhub.io/ |
 | RBAC Best Practices | https://rbac.dev/ |
 | Config Best Practices | https://kubernetes.io/docs/concepts/configuration/overview/ |
+
+---
+
+## Conclusion
+
+This repo turns 24 modules of theory and demos into a single, searchable artifact: every command actually run, every manifest actually applied, and every gotcha actually hit (including environment-specific ones like the WSL2 + `sudo minikube` profile mismatch in Module 7).
+
+**Themes that recur across the modules:**
+- **Declarative over imperative** — YAML in Git beats ad-hoc `kubectl create` for anything that lives past a demo
+- **Labels + selectors** are how every K8s object finds every other one — Service → Pod, Deployment → ReplicaSet, NetworkPolicy → workload
+- **Config separation** — Secrets for sensitive data, ConfigMaps for everything else, never bake either into images
+- **Production best practices (Module 22)** apply retroactively to every manifest written here: pin image tags, set probes, set resource requests/limits, avoid NodePort for production ingress, run ≥2 replicas
+
+**By Module 24 you should be able to:** stand up a microservices app from scratch, package it as a reusable Helm chart, deploy multiple charts together with Helmfile, secure it with RBAC, expose it with Ingress, persist its state with Volumes, and operate it day-to-day with kubectl and a managed K8s service (EKS/GKE/AKS).
+
+Until then, the [Progress Tracker](#progress-tracker) at the top of this README is the source of truth for what's done.
 | Kubectx | https://github.com/ahmetb/kubectx#installation |
