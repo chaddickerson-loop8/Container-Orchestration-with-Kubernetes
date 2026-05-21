@@ -1,14 +1,11 @@
 # Progress Tracker — Kubernetes Bootcamp
 
 ## Current Session
-**Module 5 - kubectl CLI — Main Commands**
-- [ ] kubectl get (pods, deployments, services)
-- [ ] kubectl create
-- [ ] kubectl apply
-- [ ] kubectl describe
-- [ ] kubectl logs
-- [ ] kubectl exec
-- [ ] kubectl delete
+**Module 6 - YAML Configuration Files**
+- [ ] Create nginx-deployment.yaml
+- [ ] Apply YAML file
+- [ ] Update deployments with new values
+- [ ] Compare imperative vs declarative
 
 ## All Modules
 
@@ -19,12 +16,19 @@
 
 ### Completed (Lab)
 - [x] Module 4 - Minikube & kubectl Local Setup
+- [x] Module 5 - kubectl CLI — Main Commands
+  - [x] Created nginx Deployment (imperative)
+  - [x] Edited Deployment (rolling update)
+  - [x] Created MongoDB Deployment
+  - [x] Inspected logs of a Pod
+  - [x] Got shell of running container (kubectl exec)
+  - [x] Deleted deployments
+  - [x] Applied configuration file (declarative)
 
 ### In Progress
-- [🔄] Module 5 - kubectl CLI — Main Commands
+- [🔄] Module 6 - YAML Configuration Files
 
 ### TODO
-- [ ] Module 5 - kubectl CLI — Main Commands
 - [ ] Module 6 - YAML Configuration Files
 - [ ] Module 7 - Demo — Deploy MongoDB & Mongo Express
 - [ ] Module 8 - Namespaces
@@ -48,4 +52,4 @@
 ---
 
 **Last Updated:** 2026-05-21  
-**Total Progress:** 3/24 modules (12.5%)
+**Total Progress:** 5/24 modules (20.8%)

@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+# ✅ What it does: Specifies the Kubernetes API version for this Deployment resource
+# 🧠 Why it matters: Ensures compatibility with your cluster's API capabilities
+# 🌍 DevOps/Cloud: Different versions support different features; v1 is stable production-ready
+
+kind: Deployment
+# ✅ What it does: Declares this as a Deployment (manages pod replicas and updates)
+# 🧠 Why it matters: Deployments handle scaling, rolling updates, and automatic restarts
+# 🌍 DevOps/Cloud: Core abstraction for stateless applications in production
+
+metadata:
+  # ✅ What it does: Metadata section that identifies and describes the resource
+  # 🧠 Why it matters: Labels and names enable querying, monitoring, and organization
+  # 🌍 DevOps/Cloud: Essential for multi-team environments and automation tooling
+
+  name: nginx-deployment
+  # ✅ What it does: Unique name for this Deployment in the namespace
+  # 🧠 Why it matters: Used to reference this deployment in kubectl commands and services
+  # 🌍 DevOps/Cloud: Part of service discovery; must be unique within the namespace
+
+spec:
+  # ✅ What it does: Specification section that defines desired state
+  # 🧠 Why it matters: Everything here is what Kubernetes will work to maintain
+  # 🌍 DevOps/Cloud: Declarative approach—you specify intent, K8s handles reconciliation
+
+  replicas: 2
+  # ✅ What it does: Desired number of pod copies running at all times
+  # 🧠 Why it matters: Provides high availability and load distribution across replicas
+  # 🌍 DevOps/Cloud: Core scaling unit; auto-restart if pods crash; zero-downtime updates
+
+  selector:
+    # ✅ What it does: Defines which pods this Deployment manages
+    # 🧠 Why it matters: K8s uses labels to match pods to deployments dynamically
+    # 🌍 DevOps/Cloud: Allows loose coupling; enables gradual rollouts and canary deployments
+
+    matchLabels:
+      app: nginx
+      # ✅ What it does: Label key-value pair that identifies pods for this deployment
+      # 🧠 Why it matters: Pods with label "app: nginx" are selected and managed
+      # 🌍 DevOps/Cloud: Used by Services, NetworkPolicies, and monitoring stacks for targeting
+
+  template:
+    # ✅ What it does: Template that defines how pods should be created
+    # 🧠 Why it matters: Every pod replica follows this blueprint exactly
+    # 🌍 DevOps/Cloud: Changes here trigger rolling updates across all replicas
+
+    metadata:
+      # ✅ What it does: Metadata for the pods created from this template
+      # 🧠 Why it matters: Labels on pods enable service discovery and routing
+      # 🌍 DevOps/Cloud: Service selectors match these labels to route traffic
+
+      labels:
+        app: nginx
+        # ✅ What it does: Label applied to every pod created from this template
+        # 🧠 Why it matters: Must match the selector above for deployment to manage pods
+        # 🌍 DevOps/Cloud: Used by Ingress, Services, and monitoring to identify workload
+
+    spec:
+      # ✅ What it does: Specification for containers running in each pod
+      # 🧠 Why it matters: Defines the actual application and its resource needs
+      # 🌍 DevOps/Cloud: Container spec is where security policies and resource limits live
+
+      containers:
+      - name: nginx
+        # ✅ What it does: Unique name for this container within the pod
+        # 🧠 Why it matters: Required to reference container in logs, exec, and debugging
+        # 🌍 DevOps/Cloud: Multiple containers in one pod share networking; name disambiguates
+
+        image: nginx:1.25
+        # ✅ What it does: Container image with explicit version tag (not latest)
+        # 🧠 Why it matters: Pinned versions prevent unexpected breaking changes in production
+        # 🌍 DevOps/Cloud: BP1: Never use 'latest' in production; versioning enables reproducibility
+
+        ports:
+        - containerPort: 80
+          # ✅ What it does: Port exposed by the container application
+          # 🧠 Why it matters: Services and Ingress use this to route traffic to the right port
+          # 🌍 DevOps/Cloud: Documentation of intent; Services will forward traffic to this port

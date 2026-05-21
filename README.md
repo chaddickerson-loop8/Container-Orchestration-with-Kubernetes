@@ -1,15 +1,13 @@
-
-
 # Container Orchestration with Kubernetes
 **DevOps Bootcamp — TechWorld with Nana**
 
 ---
 
 ## Progress Tracker
-- [x] Module 1: Introduction to Kubernetes
-- [x] Module 2: Basic Concepts & K8s Components
-- [x] Module 3: Kubernetes Architecture
-- [x] Module 4: Minikube & kubectl — Local Setup
+- [ ] Module 1: Introduction to Kubernetes
+- [ ] Module 2: Basic Concepts & K8s Components
+- [ ] Module 3: Kubernetes Architecture
+- [ ] Module 4: Minikube & kubectl — Local Setup
 - [ ] Module 5: kubectl CLI — Main Commands
 - [ ] Module 6: YAML Configuration Files
 - [ ] Module 7: Demo — Deploy MongoDB & Mongo Express
@@ -106,11 +104,117 @@ See: https://kubernetes.io/docs/tasks/tools/
 ## Module 5: kubectl CLI — Main Commands
 > *Core commands for managing K8s resources from the terminal.*
 
+### Inspect Cluster & Verify Setup
+
 ```bash
-# Commands will be added as each demo step is completed
+kubectl get nodes
+# List all worker and control-plane nodes
 ```
 
-<!-- Demos: nginx deploy, mongodb deploy, logs, exec, delete, apply config file -->
+```bash
+kubectl get svc
+# List all services (kubernetes service exposes cluster API)
+```
+
+### Create Deployments Imperatively
+
+```bash
+kubectl create deployment nginx-deploy --image=nginx
+# Create a deployment directly from command line
+```
+
+### Get Resources
+
+```bash
+kubectl get deployment
+# List all deployments with replica status
+```
+
+```bash
+kubectl get pod
+# List all pods with status and age
+```
+
+```bash
+kubectl get replicaset
+# List replica sets managing pod replicas
+```
+
+### Update Deployments
+
+```bash
+kubectl set image deployment/nginx-deploy nginx=nginx:1.27.0
+# Update container image in a deployment (triggers rolling update)
+```
+
+```bash
+kubectl edit deployment nginx-deploy
+# Edit deployment YAML in default editor ($EDITOR)
+```
+
+### Inspect Pod Details
+
+```bash
+kubectl describe pod mongo-deployment-5dc7f4b7d7-rx6s8
+# Show full pod details: events, status, resource requests, volumes
+```
+
+```bash
+kubectl logs nginx-deploy-696bf5ffff-bptwj
+# Show container standard output and error logs
+```
+
+### Execute Commands in Pods
+
+```bash
+kubectl exec -it mongo-deployment-5dc7f4b7d7-rx6s8 -- bin/bash
+# Open interactive shell inside a running container (debugging)
+```
+
+### Delete Resources
+
+```bash
+kubectl delete deployment mongo-deployment
+# Delete a deployment (automatically removes pods and replica sets)
+```
+
+### Apply Declarative Configuration
+
+```bash
+kubectl apply -f nginx-deployment.yaml
+# Create or update resources from YAML file (idempotent)
+```
+
+**nginx-deployment.yaml:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25
+        ports:
+        - containerPort: 80
+```
+
+### Key Learnings
+
+- **Imperative:** `kubectl create deployment` — quick for testing
+- **Declarative:** `kubectl apply -f yaml` — preferred for production (version controlled, repeatable)
+- **Rolling Updates:** `kubectl set image` or `kubectl edit` — zero-downtime deployment updates
+- **Debugging:** `kubectl logs` and `kubectl exec` — troubleshoot pod issues
+- **BP1:** Always pin image versions (nginx:1.25 not nginx)
 
 ---
 
