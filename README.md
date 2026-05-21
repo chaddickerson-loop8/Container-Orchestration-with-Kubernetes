@@ -3,6 +3,24 @@
 
 ---
 
+## Project Structure
+```
+.
+├── README.md              # All module notes, commands, and examples
+├── CLAUDE.md              # Claude assistant instructions
+├── PROGRESS.md            # Progress notes
+├── K8S-Config-Files/      # All Kubernetes manifests (apply with -f K8S-Config-Files/<file>.yaml)
+│   ├── nginx-deployment.yaml
+│   ├── nginx-service.yaml
+│   ├── mongo-secret.yaml
+│   ├── mongo.yaml
+│   ├── mongo-configmap.yaml
+│   └── mongo-express.yaml
+└── documents/             # Reference documents
+```
+
+---
+
 ## Progress Tracker
 - [ ] Module 1: Introduction to Kubernetes
 - [ ] Module 2: Basic Concepts & K8s Components
@@ -10,7 +28,7 @@
 - [ ] Module 4: Minikube & kubectl — Local Setup
 - [ ] Module 5: kubectl CLI — Main Commands
 - [x] Module 6: YAML Configuration Files
-- [ ] Module 7: Demo — Deploy MongoDB & Mongo Express
+- [x] Module 7: Demo — Deploy MongoDB & Mongo Express
 - [ ] Module 8: Namespaces
 - [ ] Module 9: Kubernetes Services
 - [ ] Module 10: Ingress
@@ -181,7 +199,7 @@ kubectl delete deployment mongo-deployment
 ### Apply Declarative Configuration
 
 ```bash
-kubectl apply -f nginx-deployment.yaml
+kubectl apply -f K8S-Config-Files/nginx-deployment.yaml
 # Create or update resources from YAML file (idempotent)
 ```
 
@@ -241,12 +259,12 @@ spec:
 
 ### Apply & Inspect
 ```bash
-kubectl apply -f nginx-deployment.yaml
-kubectl apply -f nginx-service.yaml
+kubectl apply -f K8S-Config-Files/nginx-deployment.yaml
+kubectl apply -f K8S-Config-Files/nginx-service.yaml
 kubectl describe service nginx-service   # Shows selector, endpoints, ports
 kubectl get pod -o wide                  # Shows pod IPs + node assignment
-kubectl delete -f nginx-service.yaml
-kubectl delete -f nginx-deployment.yaml
+kubectl delete -f K8S-Config-Files/nginx-service.yaml
+kubectl delete -f K8S-Config-Files/nginx-deployment.yaml
 ```
 
 ### Key Output
@@ -267,9 +285,382 @@ Endpoints are auto-populated when pod labels match the Service `selector`.
 ## Module 7: Demo — Deploy MongoDB & Mongo Express
 > *Full demo: Secret → Deployment → Service (internal) → ConfigMap → Deployment → Service (external)*
 
-```bash
-# Commands will be added as each step is completed
+### Step 1: MongoDB Secret (`mongo-secret.yaml`)
+
+Stores MongoDB root credentials as Base64-encoded values so they aren't plaintext in the Deployment manifest.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+type: Opaque
+data:
+  mongo-root-username: dXNlcm5hbWU=   # 'username' base64-encoded
+  mongo-root-password: cGFzc3dvcmQ=   # 'password' base64-encoded
 ```
+
+**Encode your own values:**
+```bash
+echo -n 'username' | base64
+echo -n 'password' | base64
+```
+
+**Apply order matters** — Secret must exist before the Deployment that references it.
+
+```bash
+kubectl apply -f K8S-Config-Files/mongo-secret.yaml
+kubectl get secret
+```
+
+**Output:**
+```
+NAME             TYPE     DATA   AGE
+mongodb-secret   Opaque   2      3m10s
+```
+
+### Step 2: MongoDB Deployment (`mongo.yaml`)
+
+Single MongoDB pod with root credentials injected from a Kubernetes **Secret** (`mongodb-secret`).
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-deployment
+  labels:
+    app: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-username
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-password
+```
+
+**Key points:**
+- `image: mongo` — official MongoDB image from Docker Hub
+- `containerPort: 27017` — MongoDB's default port
+- Credentials pulled from `mongodb-secret` via `secretKeyRef` (never plaintext in YAML)
+- Requires `mongodb-secret` to exist **before** applying this deployment
+
+**Apply & verify:**
+```bash
+kubectl apply -f K8S-Config-Files/mongo.yaml
+kubectl get all
+```
+
+**Output:**
+```
+NAME                                     READY   STATUS    RESTARTS   AGE
+pod/mongodb-deployment-df5cd6568-tb9dl   1/1     Running   0          15s
+
+NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/mongodb-deployment   1/1     1            1           15s
+
+NAME                                           DESIRED   CURRENT   READY   AGE
+replicaset.apps/mongodb-deployment-df5cd6568   1         1         1       15s
+```
+
+**Inspect the pod:**
+```bash
+kubectl describe pod mongodb-deployment-df5cd6568-tb9dl
+```
+
+**Key output (trimmed):**
+```
+Status:    Running
+IP:        10.244.0.8
+Containers:
+  mongodb:
+    Image:   mongo
+    Port:    27017/TCP
+    State:   Running
+    Ready:   True
+    Environment:
+      MONGO_INITDB_ROOT_USERNAME: <set to the key 'mongo-root-username' in secret 'mongodb-secret'>
+      MONGO_INITDB_ROOT_PASSWORD: <set to the key 'mongo-root-password' in secret 'mongodb-secret'>
+Events:
+  Normal  Scheduled  default-scheduler  Successfully assigned default/mongodb-deployment-... to minikube
+  Normal  Pulled     kubelet            Successfully pulled image "mongo"
+  Normal  Started    kubelet            Container started
+```
+
+Confirms env vars are wired to the Secret keys and the pod is healthy.
+
+### Step 3: MongoDB Internal Service (appended to `mongo.yaml`)
+
+A **ClusterIP** Service (default type) so Mongo Express can reach MongoDB inside the cluster. Appended to `mongo.yaml` as a second YAML document, separated by `---`.
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+spec:
+  selector:
+    app: mongodb        # Matches pods with label app=mongodb
+  ports:
+  - protocol: TCP
+    port: 27017         # Service port
+    targetPort: 27017   # Container port on selected pods
+```
+
+**Key points:**
+- No `type:` field → defaults to **ClusterIP** (internal-only)
+- `selector: app: mongodb` matches the Deployment's pod labels
+- Mongo Express will connect via DNS name `mongodb-service` (port 27017)
+
+**Apply & verify:**
+```bash
+kubectl apply -f K8S-Config-Files/mongo.yaml   # Re-applies Deployment + creates Service
+kubectl get svc
+kubectl describe svc mongodb-service           # Confirm Endpoints point to the pod IP
+```
+
+**Output:**
+```
+deployment.apps/mongodb-deployment unchanged
+service/mongodb-service created
+
+NAME              TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)     AGE
+kubernetes        ClusterIP   10.96.0.1     <none>        443/TCP     177m
+mongodb-service   ClusterIP   10.98.113.4   <none>        27017/TCP   0s
+```
+
+**Describe (key fields):**
+```
+Selector:    app=mongodb
+Type:        ClusterIP
+IP:          10.98.113.4
+Port:        27017/TCP
+TargetPort:  27017/TCP
+Endpoints:   10.244.0.8:27017
+```
+
+`Endpoints` matches the MongoDB pod IP — selector correctly bound the Service to the pod.
+
+**Confirm pod IP matches the Service endpoint:**
+```bash
+kubectl get pod -o wide
+```
+
+```
+NAME                                 READY   STATUS    RESTARTS   AGE   IP           NODE       NOMINATED NODE   READINESS GATES
+mongodb-deployment-df5cd6568-tb9dl   1/1     Running   0          12m   10.244.0.8   minikube   <none>           <none>
+```
+
+Pod IP `10.244.0.8` = Service `Endpoints` value above.
+
+**All MongoDB resources at a glance:**
+```bash
+kubectl get all | grep mongodb
+```
+
+```
+pod/mongodb-deployment-df5cd6568-tb9dl   1/1     Running   0          13m
+service/mongodb-service                  ClusterIP   10.98.113.4   <none>   27017/TCP   3m23s
+deployment.apps/mongodb-deployment       1/1     1            1            13m
+replicaset.apps/mongodb-deployment-df5cd6568   1   1           1            13m
+```
+
+Pod + Service + Deployment + ReplicaSet — all four resource types tied to the `mongodb` app label.
+
+### Step 4: MongoDB ConfigMap (`mongo-configmap.yaml`)
+
+Stores the MongoDB service hostname so Mongo Express can resolve it. **Non-sensitive** config (no encryption needed) — perfect ConfigMap use case.
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-configmap
+data:
+  database_url: "mongodb-service:27017"
+```
+
+**Key points:**
+- `database_url` matches the internal Service name from Step 3
+- Mongo Express resolves `mongodb-service` via cluster DNS to `10.98.113.4`
+- ConfigMap must exist **before** the Mongo Express Deployment that references it
+
+```bash
+kubectl apply -f K8S-Config-Files/mongo-configmap.yaml
+kubectl get configmap
+kubectl describe configmap mongodb-configmap
+```
+
+### Step 5: Mongo Express Deployment (`mongo-express.yaml`)
+
+Web UI for MongoDB. Pulls **credentials from the Secret** and **MongoDB hostname from the ConfigMap**.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-express
+  labels:
+    app: mongo-express
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-express
+  template:
+    metadata:
+      labels:
+        app: mongo-express
+    spec:
+      containers:
+      - name: mongo-express
+        image: mongo-express
+        ports:
+        - containerPort: 8081
+        env:
+        - name: ME_CONFIG_MONGODB_ADMINUSERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-username
+        - name: ME_CONFIG_MONGODB_ADMINPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-password
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mongodb-configmap
+              key: database_url
+        - name: ME_CONFIG_MONGODB_URL
+          value: "mongodb://$(ME_CONFIG_MONGODB_ADMINUSERNAME):$(ME_CONFIG_MONGODB_ADMINPASSWORD)@$(DATABASE_URL)"
+```
+
+**Key points:**
+- `containerPort: 8081` — Mongo Express web UI port
+- Two env vars from **Secret** (creds), one from **ConfigMap** (host)
+- `ME_CONFIG_MONGODB_URL` uses K8s `$(VAR)` substitution to build the connection URI from the other env vars
+- Final URI: `mongodb://username:password@mongodb-service:27017`
+
+**Prerequisites order:** Secret → ConfigMap → Deployment
+
+```bash
+kubectl apply -f K8S-Config-Files/mongo-express.yaml
+kubectl get pod
+kubectl logs <mongo-express-pod>          # Check it connected to MongoDB
+```
+
+**Output:**
+```
+configmap/mongodb-configmap created
+deployment.apps/mongo-express created
+
+NAME                                 READY   STATUS    RESTARTS   AGE
+mongo-express-5747d566b9-5z7vn       1/1     Running   0          24s
+mongodb-deployment-df5cd6568-tb9dl   1/1     Running   0          24m
+```
+
+**Mongo Express logs (success):**
+```
+Waiting for mongodb-service:27017...
+No custom config.js found, loading config.default.js
+Welcome to mongo-express 1.0.2
+------------------------
+Mongo Express server listening at http://0.0.0.0:8081
+Server is open to allow connections from anyone (0.0.0.0)
+basicAuth credentials are "admin:pass", it is recommended you change this in your config.js!
+```
+
+`Waiting for mongodb-service:27017` confirms DNS resolution via the ConfigMap worked — Mongo Express found MongoDB through the internal Service.
+
+### Step 6: Mongo Express External Service (appended to `mongo-express.yaml`)
+
+A **LoadBalancer** Service exposes the Mongo Express UI outside the cluster. Appended to `mongo-express.yaml` as a second YAML document.
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-express-service
+spec:
+  selector:
+    app: mongo-express
+  type: LoadBalancer
+  ports:
+  - protocol: TCP
+    port: 8081          # Service port (cluster-internal)
+    targetPort: 8081    # Container port
+    nodePort: 30000     # External node port (browser entry point)
+```
+
+**Key points:**
+- `type: LoadBalancer` — in cloud envs provisions an external LB; on Minikube acts like NodePort + needs `minikube service` to expose
+- `nodePort: 30000` — fixed external port (must be in range 30000–32767)
+- **Note:** Module 22 best practice says no NodePort for external access in production — use Ingress/LoadBalancer. This demo uses NodePort for local Minikube simplicity.
+
+**Apply & access:**
+```bash
+kubectl apply -f K8S-Config-Files/mongo-express.yaml
+kubectl get svc
+```
+
+**Output:**
+```
+deployment.apps/mongo-express unchanged
+service/mongo-express-service created
+
+NAME                    TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+mongo-express-service   LoadBalancer   10.106.14.93   <pending>     8081:30000/TCP   0s
+mongodb-service         ClusterIP      10.98.113.4    <none>        27017/TCP        19m
+```
+
+`EXTERNAL-IP: <pending>` is expected on Minikube — no real cloud LoadBalancer provisioner. Two ways to reach the UI:
+
+**Option A — `minikube service` (preferred when minikube CLI works):**
+```bash
+minikube service mongo-express-service
+```
+Opens a tunnel + browser tab automatically.
+
+**Option B — `kubectl port-forward` (fallback when minikube CLI is blocked):**
+```bash
+kubectl port-forward service/mongo-express-service 8081:8081
+```
+```
+Forwarding from 127.0.0.1:8081 -> 8081
+Forwarding from [::1]:8081 -> 8081
+```
+Then browse to **http://localhost:8081** — login `admin` / `pass`.
+
+**Gotcha (this environment):** Minikube was started with `sudo` (docker driver, WSL2). `sudo minikube service ...` fails with `Profile "minikube" not found` because the profile lives under the user's home, not root's. Use `kubectl port-forward` instead — it works as the regular user since `kubectl` already talks to the cluster.
+
+**Mongo Express UI — confirmed working:**
+
+![Mongo Express UI accessed via port-forward](./Mongoexpress_external.png)
+
+End-to-end flow verified: browser → `localhost:8081` (port-forward) → Service `mongo-express-service` → Pod `mongo-express` → reads creds from Secret + host from ConfigMap → connects to Service `mongodb-service:27017` → Pod `mongodb-deployment`.
 
 <!-- Steps: MongoDB Deployment, Secret, Internal Service, MongoExpress Deployment, ConfigMap, External Service -->
 
