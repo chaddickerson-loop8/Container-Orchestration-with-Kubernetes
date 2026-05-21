@@ -86,6 +86,9 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 ## Module 4: Minikube & kubectl — Local Setup
 > *Local K8s cluster setup for development and learning.*
 
+### Summary
+Installed Minikube + kubectl and started a local single-node Kubernetes cluster using the Docker driver. Verified the cluster with `kubectl get nodes` (single control-plane node, `Ready`, v1.35.1).
+
 ### Installation
 
 #### Minikube Installation
@@ -130,9 +133,6 @@ minikube   Ready    control-plane   4m5s   v1.35.1
 
 See: https://kubernetes.io/docs/tasks/tools/
 
-### Summary
-Installed Minikube + kubectl and started a local single-node Kubernetes cluster using the Docker driver. Verified the cluster with `kubectl get nodes` (single control-plane node, `Ready`, v1.35.1).
-
 ### Conclusion
 Local K8s sandbox is live. Every subsequent module (5–24) runs against this Minikube cluster — no cloud account needed. **Gotcha to remember:** because Minikube was started with `sudo` (Docker driver), the profile lives under root and the user's `minikube` CLI can't see it without sudo; `kubectl` works fine either way.
 
@@ -140,6 +140,9 @@ Local K8s sandbox is live. Every subsequent module (5–24) runs against this Mi
 
 ## Module 5: kubectl CLI — Main Commands
 > *Core commands for managing K8s resources from the terminal.*
+
+### Summary
+Covered the core kubectl verbs for the full resource lifecycle: **inspect** (`get`, `describe`), **create** (imperative `create` vs declarative `apply -f`), **update** (`set image`, `edit`), **debug** (`logs`, `exec -it`), and **delete**. Saw rolling updates triggered by image changes and used `exec` to shell into a running pod.
 
 ### Inspect Cluster & Verify Setup
 
@@ -253,9 +256,6 @@ spec:
 - **Debugging:** `kubectl logs` and `kubectl exec` — troubleshoot pod issues
 - **BP1:** Always pin image versions (nginx:1.25 not nginx)
 
-### Summary
-Covered the core kubectl verbs for the full resource lifecycle: **inspect** (`get`, `describe`), **create** (imperative `create` vs declarative `apply -f`), **update** (`set image`, `edit`), **debug** (`logs`, `exec -it`), and **delete**. Saw rolling updates triggered by image changes and used `exec` to shell into a running pod.
-
 ### Conclusion
 `kubectl` is the universal interface to any K8s cluster — local Minikube or production EKS/GKE/AKS. The declarative `apply -f` workflow is the production standard because YAML lives in Git (versioned, repeatable, code-reviewable). Imperative commands are best kept to learning and ad-hoc debugging. Module 6 builds directly on this by going YAML-only.
 
@@ -263,6 +263,9 @@ Covered the core kubectl verbs for the full resource lifecycle: **inspect** (`ge
 
 ## Module 6: YAML Configuration Files
 > *Declarative configuration — the preferred way to manage K8s resources.*
+
+### Summary
+Wrote paired manifests — `nginx-deployment.yaml` (2 replicas, label `app: nginx`) and `nginx-service.yaml` (selects `app: nginx`, routes service port `80` → container port `8080`). Applied both, confirmed Service `Endpoints` were auto-populated with both pod IPs, then cleaned up with `kubectl delete -f`.
 
 ### nginx-deployment.yaml
 Defines a Deployment running 2 replicas of `nginx:1.16` exposing container port `8080`. Uses label `app: nginx` so the Service can select these pods.
@@ -305,9 +308,6 @@ Endpoints are auto-populated when pod labels match the Service `selector`.
 
 **Best Practice:** Store config files in Git — either with app code or in a dedicated repo.
 
-### Summary
-Wrote paired manifests — `nginx-deployment.yaml` (2 replicas, label `app: nginx`) and `nginx-service.yaml` (selects `app: nginx`, routes service port `80` → container port `8080`). Applied both, confirmed Service `Endpoints` were auto-populated with both pod IPs, then cleaned up with `kubectl delete -f`.
-
 ### Conclusion
 YAML manifests are the unit of Kubernetes configuration: declarative, source-controllable, and idempotent under `kubectl apply`. **Label/selector matching is the connective tissue** of K8s — it's how a Service finds its Pods, how a Deployment finds its ReplicaSet, and how a ReplicaSet finds its Pods. Module 7 stacks five different manifest kinds (Secret, ConfigMap, Deployment, Service ×2) into one working app and depends on this label-matching pattern throughout.
 
@@ -315,6 +315,15 @@ YAML manifests are the unit of Kubernetes configuration: declarative, source-con
 
 ## Module 7: Demo — Deploy MongoDB & Mongo Express
 > *Full demo: Secret → Deployment → Service (internal) → ConfigMap → Deployment → Service (external)*
+
+### Summary
+Built and ran a complete 2-tier app entirely with K8s primitives, in six discrete steps:
+1. **Secret** (`mongodb-secret`) — base64 creds, mounted into pods via `secretKeyRef`
+2. **MongoDB Deployment** (`mongodb-deployment`) — single replica, env vars from the Secret
+3. **Internal Service** (`mongodb-service`, ClusterIP) — stable in-cluster DNS for MongoDB
+4. **ConfigMap** (`mongodb-configmap`) — non-sensitive `database_url` for Mongo Express
+5. **Mongo Express Deployment** (`mongo-express`) — pulls creds from Secret + host from ConfigMap, builds the connection URI via `$(VAR)` substitution
+6. **External Service** (`mongo-express-service`, LoadBalancer + NodePort 30000) — exposes the UI; accessed locally via `kubectl port-forward 8081:8081`
 
 ### Step 1: MongoDB Secret (`mongo-secret.yaml`)
 
@@ -692,15 +701,6 @@ Then browse to **http://localhost:8081** — login `admin` / `pass`.
 ![Mongo Express UI accessed via port-forward](./Mongoexpress_external.png)
 
 End-to-end flow verified: browser → `localhost:8081` (port-forward) → Service `mongo-express-service` → Pod `mongo-express` → reads creds from Secret + host from ConfigMap → connects to Service `mongodb-service:27017` → Pod `mongodb-deployment`.
-
-### Summary
-Built and ran a complete 2-tier app entirely with K8s primitives, in six discrete steps:
-1. **Secret** (`mongodb-secret`) — base64 creds, mounted into pods via `secretKeyRef`
-2. **MongoDB Deployment** (`mongodb-deployment`) — single replica, env vars from the Secret
-3. **Internal Service** (`mongodb-service`, ClusterIP) — stable in-cluster DNS for MongoDB
-4. **ConfigMap** (`mongodb-configmap`) — non-sensitive `database_url` for Mongo Express
-5. **Mongo Express Deployment** (`mongo-express`) — pulls creds from Secret + host from ConfigMap, builds the connection URI via `$(VAR)` substitution
-6. **External Service** (`mongo-express-service`, LoadBalancer + NodePort 30000) — exposes the UI; accessed locally via `kubectl port-forward 8081:8081`
 
 ### Conclusion
 This module wires together **every major K8s primitive** in one working flow: Secret + ConfigMap for config-as-code separation (sensitive vs non-sensitive), Deployment for the workloads, internal ClusterIP for service-to-service communication, and external LoadBalancer/NodePort for ingress. The pattern — *Secret → Workload → internal Service → ConfigMap → consumer Workload → external Service* — generalizes to almost every stateful app + UI deployment you'll do in K8s. The remaining modules (8–24) introduce one new primitive at a time (Namespaces, Ingress, Volumes, StatefulSet, Helm, RBAC) on top of this same scaffold.
