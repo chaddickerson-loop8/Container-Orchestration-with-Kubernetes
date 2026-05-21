@@ -29,6 +29,8 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 │   ├── mongo.yaml
 │   ├── mongo-configmap.yaml
 │   └── mongo-express.yaml
+├── Screenshots/           # Screenshots referenced from README modules
+│   └── Mongoexpress_external.png
 └── documents/             # Reference documents
 ```
 
@@ -698,7 +700,7 @@ Then browse to **http://localhost:8081** — login `admin` / `pass`.
 
 **Mongo Express UI — confirmed working:**
 
-![Mongo Express UI accessed via port-forward](./Mongoexpress_external.png)
+![Mongo Express UI accessed via port-forward](./Screenshots/Mongoexpress_external.png)
 
 End-to-end flow verified: browser → `localhost:8081` (port-forward) → Service `mongo-express-service` → Pod `mongo-express` → reads creds from Secret + host from ConfigMap → connects to Service `mongodb-service:27017` → Pod `mongodb-deployment`.
 
