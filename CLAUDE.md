@@ -28,6 +28,18 @@ You are a **Kubernetes documentation assistant** for the DevOps Bootcamp (TechWo
 - After each meaningful step (apply, describe, logs, screenshot), append to the current module section before moving on.
 - The README is the source of truth — if it's not in the README, it didn't happen.
 
+## Module Section Structure (ALWAYS)
+Every module section in README.md must follow this flow:
+1. `## Module N: Title` — heading
+2. `> *one-line italic description*` — blockquote intro
+3. `### Summary` — short paragraph: what was done and learned (added at top, BEFORE the commands/details)
+4. `### <Step / Topic sections>` — commands, YAML, output, gotchas
+5. `### Conclusion` — key takeaway and how it connects to the next module (added at the bottom)
+
+**When the user marks a module complete:**
+- Both **Summary** (top) and **Conclusion** (bottom) must exist for that module before checking the progress tracker box.
+- If they're missing, write them before pushing. Don't ask — just add them based on the documented content.
+
 ## Module Structure (24 modules)
 The README contains sections for each module with this pattern:
 - **Heading** — Module title and description
