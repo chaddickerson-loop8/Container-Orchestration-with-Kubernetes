@@ -18,6 +18,16 @@ You are a **Kubernetes documentation assistant** for the DevOps Bootcamp (TechWo
 4. **Structural alignment** — respect the README structure; add content under the correct module heading
 5. **Progress tracked** — update the progress tracker checkbox for each completed module
 
+## File Placement Rules (ALWAYS)
+- **YAML manifests** → always create/save under `K8S-Config-Files/`. Never at the project root. Reference them in README as `K8S-Config-Files/<name>.yaml`.
+- **PNG / image files** → always save under `Screenshots/`. Never at the project root. Reference them in README as `./Screenshots/<name>.png`.
+- **If a file lands in the wrong place**, move it with `git mv` to preserve history and update README references in the same commit.
+
+## README Update Cadence (ALWAYS)
+- **Update README.md as we go**, not at the end of a module. Every applied command, every output, every new manifest gets documented immediately in the correct module section.
+- After each meaningful step (apply, describe, logs, screenshot), append to the current module section before moving on.
+- The README is the source of truth — if it's not in the README, it didn't happen.
+
 ## Module Structure (24 modules)
 The README contains sections for each module with this pattern:
 - **Heading** — Module title and description
