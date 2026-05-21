@@ -9,7 +9,7 @@
 - [ ] Module 3: Kubernetes Architecture
 - [ ] Module 4: Minikube & kubectl — Local Setup
 - [ ] Module 5: kubectl CLI — Main Commands
-- [ ] Module 6: YAML Configuration Files
+- [x] Module 6: YAML Configuration Files
 - [ ] Module 7: Demo — Deploy MongoDB & Mongo Express
 - [ ] Module 8: Namespaces
 - [ ] Module 9: Kubernetes Services
@@ -221,9 +221,44 @@ spec:
 ## Module 6: YAML Configuration Files
 > *Declarative configuration — the preferred way to manage K8s resources.*
 
+### nginx-deployment.yaml
+Defines a Deployment running 2 replicas of `nginx:1.16` exposing container port `8080`. Uses label `app: nginx` so the Service can select these pods.
+
+### nginx-service.yaml
 ```yaml
-# Example YAML files will be added here
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx        # Matches pods labeled app=nginx
+  ports:
+    - protocol: TCP
+      port: 80        # Service port
+      targetPort: 8080 # Container port on selected pods
 ```
+
+### Apply & Inspect
+```bash
+kubectl apply -f nginx-deployment.yaml
+kubectl apply -f nginx-service.yaml
+kubectl describe service nginx-service   # Shows selector, endpoints, ports
+kubectl get pod -o wide                  # Shows pod IPs + node assignment
+kubectl delete -f nginx-service.yaml
+kubectl delete -f nginx-deployment.yaml
+```
+
+### Key Output
+```
+Selector:     app=nginx
+Type:         ClusterIP
+IP:           10.104.232.155
+Port:         80/TCP
+TargetPort:   8080/TCP
+Endpoints:    10.244.0.6:8080,10.244.0.7:8080
+```
+Endpoints are auto-populated when pod labels match the Service `selector`.
 
 **Best Practice:** Store config files in Git — either with app code or in a dedicated repo.
 

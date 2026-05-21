@@ -1,0 +1,23 @@
+apiVersion: v1                  # ✅ What it does: Specifies the API version used to create the service
+                                # 🧠 Why it matters: Ensures compatibility with the Kubernetes API
+
+kind: Service                   # ✅ What it does: Declares this resource as a Service
+                                # 🧠 Why it matters: Kubernetes will treat this definition as a network service
+
+metadata:
+  name: nginx-service           # ✅ What it does: Names the service 'nginx-service'
+                                # 🧠 Why it matters: The name is used for DNS-based access within the cluster
+
+spec:
+  selector:                     # ✅ What it does: Matches pods with the label 'app: nginx'
+    app: nginx                  # 🧠 Why it matters: Only pods with this label will receive traffic
+
+  ports:
+    - protocol: TCP             # ✅ What it does: Uses TCP as the network protocol
+                                # 🧠 Why it matters: TCP is the default protocol for most HTTP services
+
+      port: 80                  # ✅ What it does: Exposes port 80 on the service
+                                # 🧠 Why it matters: This is the port other services/pods will connect to
+
+      targetPort: 8080          # ✅ What it does: Routes traffic to container port 8080 on selected pods
+                                # 🧠 Why it matters: Must match the actual port used inside the nginx containers
