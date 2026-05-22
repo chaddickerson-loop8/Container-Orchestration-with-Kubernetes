@@ -42,7 +42,7 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 │       ├── dashboard-first-access-2.png
 │       ├── dashboard-first-access-3.png
 │       └── dashboard-after-portforward.png
-└── documents/             # Reference documents
+└── Documents/             # Reference documents
 ```
 
 ---
