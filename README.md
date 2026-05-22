@@ -28,9 +28,16 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 │   ├── mongo-secret.yaml
 │   ├── mongo.yaml
 │   ├── mongo-configmap.yaml
-│   └── mongo-express.yaml
-├── Screenshots/           # Screenshots referenced from README modules
-│   └── Mongoexpress_external.png
+│   ├── mongo-express.yaml
+│   └── dashboard-ingress.yaml
+├── Screenshots/           # Screenshots referenced from README modules (per-module subfolders)
+│   ├── Module-07/
+│   │   └── mongo-express-external.png
+│   └── Module-10/
+│       ├── dashboard-first-access-1.png
+│       ├── dashboard-first-access-2.png
+│       ├── dashboard-first-access-3.png
+│       └── dashboard-after-portforward.png
 └── documents/             # Reference documents
 ```
 
@@ -46,7 +53,7 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 - [x] Module 7: Demo — Deploy MongoDB & Mongo Express
 - [ ] Module 8: Namespaces
 - [ ] Module 9: Kubernetes Services
-- [ ] Module 10: Ingress
+- [x] Module 10: Ingress
 - [ ] Module 11: Persisting Data with Volumes
 - [ ] Module 12: ConfigMap & Secret Volume Types
 - [ ] Module 13: StatefulSet — Deploying Stateful Apps
@@ -700,7 +707,7 @@ Then browse to **http://localhost:8081** — login `admin` / `pass`.
 
 **Mongo Express UI — confirmed working:**
 
-![Mongo Express UI accessed via port-forward](./Screenshots/Mongoexpress_external.png)
+![Mongo Express UI accessed via port-forward](./Screenshots/Module-07/mongo-express-external.png)
 
 End-to-end flow verified: browser → `localhost:8081` (port-forward) → Service `mongo-express-service` → Pod `mongo-express` → reads creds from Secret + host from ConfigMap → connects to Service `mongodb-service:27017` → Pod `mongodb-deployment`.
 
@@ -730,11 +737,186 @@ This module wires together **every major K8s primitive** in one working flow: Se
 ---
 
 ## Module 10: Ingress
-> *Routing external HTTP/S traffic into the cluster.*
+> *Routing external HTTP/S traffic into the cluster via an Ingress Controller.*
 
-```yaml
-# Ingress rules will be added here
+### Summary
+Stood up the **NGINX Ingress Controller** on Minikube and routed `http://dashboard.com` to the built-in Kubernetes Dashboard via an Ingress rule. Six steps: deploy the dashboard (`minikube dashboard`) → enable the `ingress` addon (installs NGINX controller in `ingress-nginx` namespace) → write `dashboard-ingress.yaml` (host `dashboard.com` → Service `kubernetes-dashboard:80`) → map `dashboard.com → 127.0.0.1` in **both** WSL `/etc/hosts` **and** Windows `C:\Windows\System32\drivers\etc\hosts` → expose the controller on a local port → hit `http://dashboard.com:8080` in the browser.
+
+**Important gotcha for this environment:** `minikube dashboard` alone does **not** validate the Ingress demo — it opens an ephemeral `kubectl proxy` tunnel directly to the dashboard Service, bypassing the Ingress entirely. To actually test the Ingress rule you need the NGINX controller to be reachable on a port the browser can hit (`minikube tunnel` OR `kubectl port-forward`). In this WSL2 + sudo-Docker setup, `minikube tunnel` requires interactive sudo, so `kubectl port-forward` on port `8080` was used instead — same routing path through NGINX → Ingress → Service, just on a non-privileged port.
+
+### Step 1: Open the Kubernetes Dashboard
+```bash
+minikube dashboard --url
+# Opens kubectl proxy + prints a URL; deploys kubernetes-dashboard Deployment + Service
 ```
+
+**Output (key parts):**
+```
+* Enabling dashboard ...
+  - Using image docker.io/kubernetesui/dashboard:v2.7.0
+* Verifying dashboard health ...
+* Launching proxy ...
+http://127.0.0.1:41881/api/v1/namespaces/kubernetes-dashboard/services/http:kubernetes-dashboard:/proxy/
+```
+
+The dashboard is now running in the `kubernetes-dashboard` namespace:
+```bash
+kubectl get all -n kubernetes-dashboard
+```
+```
+NAME                                READY   STATUS    RESTARTS   AGE
+pod/kubernetes-dashboard-...        1/1     Running   0          2m
+
+NAME                                TYPE        CLUSTER-IP       PORT(S)
+service/kubernetes-dashboard        ClusterIP   10.96.131.140    80/TCP
+```
+
+The Service `kubernetes-dashboard` (ClusterIP, port 80) is the Ingress backend target.
+
+### Step 2: Enable the Ingress Addon (NGINX Controller)
+```bash
+minikube addons enable ingress
+# Installs ingress-nginx controller (Deployment + Service) into ingress-nginx namespace
+```
+
+**Verify the controller pod:**
+```bash
+kubectl get pods -n ingress-nginx
+```
+```
+NAME                                        READY   STATUS      AGE
+ingress-nginx-admission-create-xxxxx        0/1     Completed   25s
+ingress-nginx-admission-patch-xxxxx         0/1     Completed   25s
+ingress-nginx-controller-xxxxxxxxxx-xxxxx   1/1     Running     25s
+```
+
+The controller is a Deployment of an NGINX-based reverse proxy that watches `Ingress` resources and configures itself dynamically.
+
+### Step 3: Create the Ingress Rule
+
+**`K8S-Config-Files/dashboard-ingress.yaml`:**
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard-ingress
+  namespace: kubernetes-dashboard
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: dashboard.com
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: kubernetes-dashboard
+              port:
+                number: 80
+```
+
+**Key points:**
+- `namespace: kubernetes-dashboard` — Ingress must live in the same namespace as the backend Service it references
+- `ingressClassName: nginx` — picks the NGINX controller installed by the addon
+- `host: dashboard.com` — NGINX routes requests with this `Host:` header to the backend
+- `backend.service.name: kubernetes-dashboard` + `port: 80` — points at the dashboard Service from Step 1
+
+```bash
+kubectl apply -f K8S-Config-Files/dashboard-ingress.yaml
+kubectl get ingress -n kubernetes-dashboard
+```
+
+**Output:**
+```
+NAME                CLASS   HOSTS           ADDRESS        PORTS   AGE
+dashboard-ingress   nginx   dashboard.com   192.168.49.2   80      30s
+```
+
+`ADDRESS` = the Minikube node IP. On WSL2 + Docker driver this IP is **not** reachable from the Windows browser — see Step 5.
+
+### Step 4: Map `dashboard.com` to localhost in Hosts Files
+
+On WSL2 you must edit **two** hosts files — they're independent:
+
+**WSL `/etc/hosts`** (used by `curl`, `ping` from inside WSL):
+```bash
+sudo sh -c 'echo "127.0.0.1 dashboard.com" >> /etc/hosts'
+grep dashboard.com /etc/hosts
+# 127.0.0.1 dashboard.com
+```
+
+**Windows `C:\Windows\System32\drivers\etc\hosts`** (used by the Windows browser):
+
+Open **PowerShell as Administrator**, paste each line separately (single-line — avoids terminal wrapping breaking the command):
+```powershell
+$f="C:\Windows\System32\drivers\etc\hosts"
+"127.0.0.1 dashboard.com" | Out-File $f -Encoding ASCII
+```
+
+**Verify from Windows PowerShell:**
+```
+ipconfig /flushdns
+ping dashboard.com
+# Pinging dashboard.com [127.0.0.1] with 32 bytes of data:
+# Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+```
+
+**Encoding gotcha (burned ~30 min):** PowerShell's `>>` redirect writes **UTF-16 LE** by default. A UTF-16-encoded line inside an otherwise ASCII hosts file makes the Windows DNS resolver **silently skip** the entry and fall through to public DNS (which resolves `dashboard.com` to a real public IP — a Vercel app, in this case). Symptom: `ping dashboard.com` returns a public IP, browser hits the wrong site. Fix: rewrite the file with `Out-File -Encoding ASCII` so it's plain ASCII. Confirmed working when `ping dashboard.com` returns `127.0.0.1`.
+
+### Step 5: Expose the NGINX Ingress Controller Locally
+
+`Ingress.ADDRESS = 192.168.49.2` is on Docker's internal network — unreachable from the Windows browser. Two ways to bridge it:
+
+**Option A — `minikube tunnel` (standard for Module 10):**
+```bash
+minikube tunnel
+# Prompts for sudo (binds privileged ports 80/443) — keep the terminal open
+```
+After this, `http://dashboard.com` (port 80) works directly.
+
+**Option B — `kubectl port-forward` (used here, no sudo needed):**
+```bash
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80 --address 0.0.0.0
+# Forwarding from 0.0.0.0:8080 -> 80
+```
+Then browse to `http://dashboard.com:8080`.
+
+**Why this works:** the NGINX controller routes based on the `Host:` HTTP header, not the port. As long as the browser sends `Host: dashboard.com`, NGINX finds the matching Ingress rule and proxies the request to the `kubernetes-dashboard` Service.
+
+**Why `minikube dashboard` alone doesn't demo the Ingress:** it spins up `kubectl proxy` on an ephemeral port and tunnels directly to the dashboard Service — short-circuiting NGINX entirely. The Ingress rule from Step 3 is never exercised. To prove Module 10, the browser must go **through** the NGINX Ingress Controller, which requires Option A or B above.
+
+### Step 6: Verify in Browser
+
+Browse to:
+```
+http://dashboard.com:8080
+```
+
+Path: browser → port-forward (8080→80) → `ingress-nginx-controller` pod → matches `Host: dashboard.com` → routes to `kubernetes-dashboard` Service (ClusterIP) → dashboard pod.
+
+**First access — debugging the connection chain:**
+
+![Dashboard first access — initial attempt](./Screenshots/Module-10/dashboard-first-access-1.png)
+![Dashboard first access — Windows DNS still resolving to public IP](./Screenshots/Module-10/dashboard-first-access-2.png)
+![Dashboard first access — connection refused before port-forward](./Screenshots/Module-10/dashboard-first-access-3.png)
+
+**Working state — after `kubectl port-forward` on port 8080:**
+
+![Kubernetes Dashboard reached via Ingress at dashboard.com:8080](./Screenshots/Module-10/dashboard-after-portforward.png)
+
+### Key Learnings & Gotchas
+
+- **Ingress = L7 router**, Service = L4 endpoint. The Ingress object is just *config* — the **Ingress Controller** (NGINX here) is the actual reverse-proxy pod that enforces it.
+- **One controller per cluster** (typically). Multiple Ingress resources from many namespaces all share one NGINX deployment.
+- **`namespace` must match the backend Service** — Ingress can only reference Services in its own namespace.
+- **WSL2 has two hosts files** — WSL and Windows. The Windows browser only reads the Windows one.
+- **PowerShell `>>` writes UTF-16** — corrupts the hosts file silently. Use `Out-File -Encoding ASCII`.
+- **`minikube dashboard` bypasses Ingress** — don't use it to validate this module.
+- **`minikube tunnel` needs sudo** — on this WSL2 + sudo-started Minikube, `kubectl port-forward` on a high port is a clean fallback that exercises the same path.
+
+### Conclusion
+Module 10 introduces the **first piece of K8s infrastructure that lives between the outside world and a Service**: the Ingress Controller. Up through Module 7, external access was either NodePort (Module 22 best-practice says no) or LoadBalancer (cloud-only / Minikube-pending). The Ingress pattern — **one external entry point + per-host/per-path rules + a shared NGINX controller** — is what every production cluster uses to fan out HTTPS traffic to dozens of microservices on a single IP and a single TLS certificate. The next modules (11–13) move down the stack to storage and stateful workloads, but every external HTTP/S route in those demos still flows through the controller wired up here.
 
 ---
 
