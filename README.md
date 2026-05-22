@@ -52,7 +52,7 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 - [ ] Module 2: Basic Concepts & K8s Components
 - [ ] Module 3: Kubernetes Architecture
 - [x] Module 4: Minikube & kubectl — Local Setup
-- [ ] Module 5: kubectl CLI — Main Commands
+- [x] Module 5: kubectl CLI — Main Commands
 - [x] Module 6: YAML Configuration Files
 - [x] Module 7: Demo — Deploy MongoDB & Mongo Express
 - [ ] Module 8: Namespaces

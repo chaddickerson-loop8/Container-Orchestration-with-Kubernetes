@@ -39,6 +39,7 @@ Every module section in README.md must follow this flow:
 **When the user marks a module complete:**
 - Both **Summary** (top) and **Conclusion** (bottom) must exist for that module before checking the progress tracker box.
 - If they're missing, write them before pushing. Don't ask — just add them based on the documented content.
+- **Always update the progress tracker checkbox** at the top of README.md (`- [ ]` → `- [x]`) in the same commit. Don't wait to be told — flipping the box is part of "module done."
 
 ## Module Structure (24 modules)
 The README contains sections for each module with this pattern:
