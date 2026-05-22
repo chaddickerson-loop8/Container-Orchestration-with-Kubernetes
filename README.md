@@ -29,7 +29,11 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 │   ├── mongo.yaml
 │   ├── mongo-configmap.yaml
 │   ├── mongo-express.yaml
-│   └── dashboard-ingress.yaml
+│   ├── dashboard-ingress.yaml
+│   ├── mosquitto-without-volumes.yaml
+│   ├── config-file.yaml
+│   ├── secret-file.yaml
+│   └── mosquitto.yaml
 ├── Screenshots/           # Screenshots referenced from README modules (per-module subfolders)
 │   ├── Module-07/
 │   │   └── mongo-express-external.png
@@ -55,7 +59,7 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 - [ ] Module 9: Kubernetes Services
 - [x] Module 10: Ingress
 - [ ] Module 11: Persisting Data with Volumes
-- [ ] Module 12: ConfigMap & Secret Volume Types
+- [x] Module 12: ConfigMap & Secret Volume Types
 - [ ] Module 13: StatefulSet — Deploying Stateful Apps
 - [ ] Module 14: Managed Kubernetes Services
 - [ ] Module 15: Helm — Package Manager
@@ -930,11 +934,252 @@ Module 10 introduces the **first piece of K8s infrastructure that lives between 
 ## Module 12: ConfigMap & Secret Volume Types
 > *Mounting config files and secrets as volumes into pods.*
 
-```bash
-# Demo: Mosquitto deployment with ConfigMap and Secret volumes
+### Summary
+Demonstrated the **other** way to consume ConfigMaps and Secrets in K8s — as **mounted volumes** rather than environment variables (the pattern used in Module 7). Built up the Mosquitto MQTT broker in seven steps: baseline Deployment (no volumes) → `exec` into the pod to inspect the default `/mosquitto/config/mosquitto.conf` → delete the baseline → create a `ConfigMap` carrying our own `mosquitto.conf` → create a `Secret` carrying a `secret.file` → re-deploy Mosquitto with `volumes:` + `volumeMounts:` pointing at both → verify the files appear inside the pod with correct content.
+
+### Step 1: Baseline Mosquitto Deployment (no volumes)
+
+Plain Mosquitto MQTT broker, no config and no secrets mounted yet — the starting point before adding ConfigMap and Secret **volumes** in later steps.
+
+**`K8S-Config-Files/mosquitto-without-volumes.yaml`:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+  labels:
+    app: mosquitto
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mosquitto
+  template:
+    metadata:
+      labels:
+        app: mosquitto
+    spec:
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:2.0
+          ports:
+            - containerPort: 1883
 ```
 
-<!-- Steps: Mosquitto deploy, ConfigMap, Secret, updated Deployment with volumes -->
+```bash
+kubectl apply -f K8S-Config-Files/mosquitto-without-volumes.yaml
+kubectl get pods -l app=mosquitto
+```
+
+**Output:**
+```
+deployment.apps/mosquitto created
+NAME                        READY   STATUS    RESTARTS   AGE
+mosquitto-8bbb9c957-tp8cd   1/1     Running   0          22s
+```
+
+Pod runs the default `eclipse-mosquitto:2.0` image with no external config. Next steps will introduce a ConfigMap (mosquitto config file) and a Secret (credentials) mounted as **volumes** rather than env vars — the distinction this module teaches.
+
+### Step 2: Inspect the Default Config Inside the Pod
+
+Before mounting our own config, look at what ships in the image:
+
+```bash
+kubectl exec mosquitto-8bbb9c957-tp8cd -- cat /mosquitto/config/mosquitto.conf
+```
+
+Returns a ~40 KB reference config where **every actual setting is commented out**. The broker is running entirely on built-in defaults (anonymous access, listener on `1883`, no persistence). This is the file the ConfigMap volume will replace in Step 5.
+
+### Step 3: Clean Up the Baseline Deployment
+
+```bash
+kubectl delete -f K8S-Config-Files/mosquitto-without-volumes.yaml
+# deployment.apps "mosquitto" deleted from default namespace
+```
+
+We'll re-apply with the volume-mounted version after the ConfigMap and Secret exist.
+
+### Step 4: Create the ConfigMap (`config-file.yaml`)
+
+Holds the active `mosquitto.conf` contents as ConfigMap data. The key (`mosquitto.conf`) will become the **filename** when mounted as a volume.
+
+**`K8S-Config-Files/config-file.yaml`:**
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: mosquitto-config-file
+data:
+    mosquitto.conf: |
+        log_dest stdout
+        log_type all
+        log_timestamp true
+        listener 9001
+```
+
+```bash
+kubectl apply -f K8S-Config-Files/config-file.yaml
+kubectl get configmap mosquitto-config-file
+```
+
+**Output:**
+```
+configmap/mosquitto-config-file created
+NAME                    DATA   AGE
+mosquitto-config-file   1      0s
+```
+
+`DATA: 1` = one key (`mosquitto.conf`). When mounted as a volume at `/mosquitto/config/`, this becomes a file at `/mosquitto/config/mosquitto.conf`.
+
+### Step 5: Create the Secret (`secret-file.yaml`)
+
+Holds a credential blob as base64-encoded data. Mounted the same way as the ConfigMap — the key (`secret.file`) becomes a filename inside the pod.
+
+**`K8S-Config-Files/secret-file.yaml`:**
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: mosquitto-secret-file
+type: Opaque
+data:
+    secret.file: |
+        VGVjaFdvcmxkMjAyMyEgLW4K
+```
+
+```bash
+kubectl apply -f K8S-Config-Files/secret-file.yaml
+kubectl get secret mosquitto-secret-file
+```
+
+**Output:**
+```
+secret/mosquitto-secret-file created
+NAME                    TYPE     DATA   AGE
+mosquitto-secret-file   Opaque   1      0s
+```
+
+`Opaque` = generic user-supplied secret (vs. typed secrets like `kubernetes.io/tls`). `DATA: 1` = one key (`secret.file`).
+
+### Step 6: Re-deploy Mosquitto with Volume Mounts (`mosquitto.yaml`)
+
+Same baseline Deployment as Step 1, **plus** `volumes:` at the pod spec level and `volumeMounts:` inside the container.
+
+**`K8S-Config-Files/mosquitto.yaml`:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+  labels:
+    app: mosquitto
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mosquitto
+  template:
+    metadata:
+      labels:
+        app: mosquitto
+    spec:
+        containers:
+          - name: mosquitto
+            image: eclipse-mosquitto:2.0
+            ports:
+              - containerPort: 1883
+            volumeMounts:
+              - name: mosquitto-config
+                mountPath: /mosquitto/config
+              - name: mosquitto-secret
+                mountPath: /mosquitto/secret
+                readOnly: true
+        volumes:
+          - name: mosquitto-config
+            configMap:
+              name: mosquitto-config-file
+          - name: mosquitto-secret
+            secret:
+              secretName: mosquitto-secret-file
+```
+
+**Key points:**
+- `volumes:` declares two named volumes — one backed by the ConfigMap, one by the Secret
+- `volumeMounts:` attaches each volume to a directory inside the container
+- Each ConfigMap/Secret **key** (`mosquitto.conf`, `secret.file`) becomes a **file** under its mount path
+- `readOnly: true` on the Secret mount is a sensible default — the pod has no reason to write back to it
+
+```bash
+kubectl apply -f K8S-Config-Files/mosquitto.yaml
+kubectl get pods -l app=mosquitto
+```
+
+**Output:**
+```
+deployment.apps/mosquitto created
+NAME                        READY   STATUS    RESTARTS   AGE
+mosquitto-cf9f594cd-wn6gq   1/1     Running   0          38s
+```
+
+### Step 7: Verify the Volume Mounts
+
+One command that captures everything — pod status, mount contents, and decoded files:
+
+```bash
+POD=$(kubectl get pod -l app=mosquitto -o jsonpath='{.items[0].metadata.name}') && \
+  echo "=== Pod: $POD ===" && \
+  kubectl get pod $POD && \
+  echo "--- ls /mosquitto/config ---" && \
+  kubectl exec $POD -- ls -la /mosquitto/config && \
+  echo "--- ls /mosquitto/secret ---" && \
+  kubectl exec $POD -- ls -la /mosquitto/secret && \
+  echo "--- cat /mosquitto/config/mosquitto.conf ---" && \
+  kubectl exec $POD -- cat /mosquitto/config/mosquitto.conf && \
+  echo "--- cat /mosquitto/secret/secret.file ---" && \
+  kubectl exec $POD -- cat /mosquitto/secret/secret.file
+```
+
+**Output (trimmed):**
+```
+=== Pod: mosquitto-cf9f594cd-wn6gq ===
+mosquitto-cf9f594cd-wn6gq   1/1     Running   0   38s
+
+--- ls /mosquitto/config ---
+..data -> ..2026_05_22_21_17_13.1163115724
+mosquitto.conf -> ..data/mosquitto.conf
+
+--- ls /mosquitto/secret ---
+..data -> ..2026_05_22_21_17_13.2049377479
+secret.file -> ..data/secret.file
+
+--- cat /mosquitto/config/mosquitto.conf ---
+log_dest stdout
+log_type all
+log_timestamp true
+listener 9001
+
+--- cat /mosquitto/secret/secret.file ---
+TechWorld2023! -n
+```
+
+**Two confirmations from this output:**
+1. The ConfigMap's `mosquitto.conf` content (4 lines) replaced the 40 KB default — the volume mount **overlays** `/mosquitto/config/`.
+2. The Secret's base64-encoded `VGVjaFdvcmxkMjAyMyEgLW4K` was decoded automatically by the Secret volume and written as plaintext `TechWorld2023! -n` to `/mosquitto/secret/secret.file`.
+
+Same verification in one shot using `kubectl exec deploy/mosquitto -- sh -c '...'` against the Deployment directly (no need to look up the pod name):
+
+```bash
+kubectl exec deploy/mosquitto -- sh -c 'cat /mosquitto/config/mosquitto.conf; echo ---; cat /mosquitto/secret/secret.file'
+```
+
+![Mosquitto pod — ConfigMap and Secret volume mounts verified](./Screenshots/Module-12/mosquitto-volumes-verified.png)
+
+**Atomic-update internals:** the `..data → ..<timestamp>` symlink pattern is how K8s does live ConfigMap/Secret updates — when you `kubectl apply` a change, the kubelet writes a new timestamped directory next to the old one, then atomically swaps the `..data` symlink. The container sees the new files appear in one consistent step, never half-updated.
+
+### Conclusion
+Module 12 closes the gap from Module 7: **the same** ConfigMap and Secret primitives can be consumed two completely different ways. **Env vars (Module 7)** are right for short scalar values like a hostname, username, or password that the app reads from its environment. **Volume mounts (Module 12)** are right for **files** — config files, TLS certs, signing keys, large blobs, anything the app expects to `open()` on disk. The volume pattern also gets you live updates for free (the `..data` symlink swap), so a ConfigMap edit propagates into running pods without a restart. Module 13 (StatefulSet) reuses both volume-style patterns alongside `PersistentVolumeClaim`s to give each replica its own stable storage.
+
+<!-- Steps: Mosquitto deploy ✅, ConfigMap ✅, Secret ✅, Volume-mounted Deployment ✅, Verified ✅ -->
 
 ---
 
