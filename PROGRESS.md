@@ -11,7 +11,11 @@
 - CI/CD workflow structure created locally.
 - Branch: `helm-demo-managed-k8s`.
 - kubeconfig stored as GitHub Secret: `KUBE_CONFIG`.
-- Pipeline success screenshot saved to `Screenshots/Module-16/` (per CLAUDE.md screenshot rule — task template referenced `docs/screenshots/module-16/` but project convention is `Screenshots/`).
+- All pipeline screenshots saved to `Screenshots/Module-16/` (per CLAUDE.md screenshot rule — task templates referenced `docs/screenshots/module-16/` but project convention is `Screenshots/`).
+- Screenshots placed inline under their matching pipeline steps in `README.md`:
+  - `CiCD-K8s_connection.png` → **Verify Cluster Connection (Step 3b)**
+  - `Helm-iinstall-cicd-staus-sucess.png` → **Step 3: Helm Setup and Bitnami Repository via CI/CD Pipeline**
+  - `deploy MongoDB replica set on DOKS via Helm in CICD.png` → **Step 4: Helm Deployment of MongoDB with Replicas and Secrets**
 
 ### Checklist
 - [x] CI/CD workflow created (`.github/workflows/deploy.yml`, triggers on `helm-demo-managed-k8s`)

@@ -1336,6 +1336,10 @@ With Helm primed and the Bitnami MongoDB chart resolvable, the pipeline now perf
 12. **Verify all resources** — `kubectl get all` shows the StatefulSet, headless Service, and any related Pod/PVC objects Helm rendered.
 13. **Verify MongoDB secrets** — `kubectl get secret` confirms the chart created the `mongodb` Secret holding the root password (sourced from `helm-mongodb.yaml`).
 
+**Pipeline success — `helm install` + the three `kubectl get …` verify steps all green against DOKS:**
+
+![Deploy MongoDB replica set on DOKS via Helm in CI/CD](./Screenshots/Module-16/deploy%20MongoDB%20replica%20set%20on%20DOKS%20via%20Helm%20in%20CICD.png)
+
 **Reference:** [Bitnami MongoDB Helm Chart](https://github.com/bitnami/charts/tree/main/bitnami/mongodb)
 
 > ⚠️ **Security note:** `rootPassword` in `helm-mongodb.yaml` is for **demo purposes only**. In production, use GitHub Secrets (or a secrets manager like Vault / AWS Secrets Manager) and reference them via `--set` or sealed values. **Never commit real passwords to the repo.**
