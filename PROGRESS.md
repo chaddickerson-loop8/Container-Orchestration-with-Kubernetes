@@ -19,7 +19,7 @@
 - [x] CI/CD workflow created
 - [x] KUBE_CONFIG secret instructions documented
 - [x] Cluster verification step added to workflow
-- [ ] Verify cluster connection confirmed in Actions
+- [x] Verify cluster connection confirmed in Actions (run 26474393325 / commit f57aae9)
 - [ ] Add `KUBE_CONFIG` secret in GitHub repo settings
 - [ ] Wire up real Helm deploy steps (MongoDB replica set + Mongo Express + NGINX Ingress)
 - [ ] Verify deploy run against DOKS cluster `k8s-helm-demo`

@@ -1212,11 +1212,82 @@ Module 12 closes the gap from Module 7: **the same** ConfigMap and Secret primit
 ## Module 16: Helm Demo — Stateful App on K8s
 > *Deploy replicated MongoDB + MongoExpress + NGINX Ingress on a DigitalOcean managed Kubernetes cluster (DOKS).*
 
-```bash
-# Commands will be added as each step is completed
+### Summary
+Module 16 leaves Minikube behind and moves the demo onto a real managed Kubernetes cluster (DigitalOcean DOKS — `k8s-helm-demo`) driven entirely by GitHub Actions. The first milestone — covered in this update — is wiring the CI/CD pipeline end-to-end and proving the runner can authenticate against the cluster before any Helm work runs. A dedicated feature branch (`helm-demo-managed-k8s`) holds the workflow, the kubeconfig is stored as the `KUBE_CONFIG` repo secret (never on disk, never committed), and a "Verify cluster connection" step fails fast if the secret is wrong or the cluster is unreachable. Helm install + deploy steps are scaffolded but commented out until the connection check is green.
+
+### Branch & Cluster Setup
+- **Feature branch:** `helm-demo-managed-k8s` — per [`.github/BRANCH-STRATEGY.md`](./.github/BRANCH-STRATEGY.md), feature work lands here first, then promotes `feature → k8s → main`. `main` is never targeted directly by the CI pipeline.
+- **Cluster:** `k8s-helm-demo` — 2-node pool on DigitalOcean, v1.36.0.
+- **kubeconfig:** downloaded from the DigitalOcean console, pasted into the GitHub repo secret named **`KUBE_CONFIG`**. Full setup steps in [`.github/README-secrets.md`](./.github/README-secrets.md).
+
+### CI/CD Workflow — [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml)
+Two jobs, `build` → `deploy`. The `deploy` job authenticates against DOKS via the kubeconfig secret, then (eventually) runs Helm. All tooling is fetched directly from upstream — `kubernetes.io`, `helm.sh` — no third-party or cloud-vendor-specific actions.
+
+**Trigger:**
+```yaml
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - helm-demo-managed-k8s
 ```
 
-<!-- Steps: K8s cluster on DigitalOcean (DOKS), MongoDB StatefulSet via Helm, MongoExpress, NGINX Ingress -->
+> **Gotcha — `workflow_dispatch` and non-default branches:** the "Run workflow" button in the Actions UI only surfaces for workflows that exist on the **default branch**. Since this workflow lives on `helm-demo-managed-k8s` and won't reach `main` until the module is complete, the `push:` trigger was enabled so every push to the feature branch auto-runs the pipeline.
+
+**Authenticate against DOKS:**
+```yaml
+- name: Configure kubeconfig from GitHub Secret
+  run: |
+    mkdir -p $HOME/.kube
+    echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+    chmod 600 $HOME/.kube/config
+```
+
+`chmod 600` is kept because the secret is decrypted to plain disk on the runner — `kubectl` warns on world/group-readable kubeconfigs, and the perms are a defense-in-depth bet against any future self-hosted runner.
+
+### Verify Cluster Connection (Step 3b)
+A new step sits between the kubeconfig write and the Helm install so a bad / expired secret fails fast with a clear error before any deploy work runs:
+
+```yaml
+- name: Verify cluster connection
+  run: |
+    kubectl cluster-info
+    kubectl get nodes
+```
+
+**Output from the first successful run (`f57aae9` / run id `26474393325`):**
+```
+Kubernetes control plane is running at https://3d495365-...k8s.ondigitalocean.com
+CoreDNS is running at https://3d495365-...k8s.ondigitalocean.com/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+NAME                        STATUS   ROLES    AGE   VERSION
+pool-k8s-helm-demo-38e5s0   Ready    <none>   89m   v1.36.0
+pool-k8s-helm-demo-38e5sd   Ready    <none>   89m   v1.36.0
+```
+
+This confirms three things at once: the `KUBE_CONFIG` secret was written to the runner correctly, `kubectl` can authenticate against the DOKS API, and the cluster is reachable from GitHub-hosted runners.
+
+### Helm Steps — Deferred
+The `Install Helm` and `Deploy` steps are intentionally commented out in `deploy.yml` until the connection check is proven green. The scaffold:
+
+```yaml
+# # Step 4 — install Helm directly from the official helm.sh installer script.
+# - name: Install Helm
+#   run: |
+#     curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o get_helm.sh
+#     chmod +x get_helm.sh
+#     ./get_helm.sh
+#     helm version
+#
+# # Step 5 — placeholder deploy step. Real `helm upgrade --install` commands go here later.
+# - name: Deploy
+#   run: echo "Deploy step - coming soon"
+```
+
+Real `helm upgrade --install` commands for MongoDB (replicated StatefulSet), Mongo Express, and NGINX Ingress will replace the placeholder once Helm is uncommented.
+
+### Conclusion
+The Module 16 pipeline is live: every push to `helm-demo-managed-k8s` now authenticates against DOKS and verifies the cluster is reachable before any deploy work runs. The "connection-check first" structure means a bad kubeconfig fails in seconds with a readable error instead of halfway through a Helm release. With CI plumbing proven, the next step is to uncomment the Helm install + deploy steps and bring up the MongoDB replica set, Mongo Express, and NGINX Ingress on the real cluster — leading directly into Module 17's private-registry work.
 
 ---
 
