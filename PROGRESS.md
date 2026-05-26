@@ -16,6 +16,10 @@
 - [x] CI/CD workflow scaffolded (`.github/workflows/deploy.yml`, triggers on `helm-demo-managed-k8s`)
 - [x] Secret-setup instructions documented (`.github/README-secrets.md`)
 - [x] Branch strategy documented (`.github/BRANCH-STRATEGY.md`)
+- [x] CI/CD workflow created
+- [x] KUBE_CONFIG secret instructions documented
+- [x] Cluster verification step added to workflow
+- [ ] Verify cluster connection confirmed in Actions
 - [ ] Add `KUBE_CONFIG` secret in GitHub repo settings
 - [ ] Wire up real Helm deploy steps (MongoDB replica set + Mongo Express + NGINX Ingress)
 - [ ] Verify deploy run against DOKS cluster `k8s-helm-demo`

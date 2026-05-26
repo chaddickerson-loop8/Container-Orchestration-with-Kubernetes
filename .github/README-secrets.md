@@ -44,6 +44,24 @@ The kubeconfig is **never committed to the repo**. It only lives in two places:
 
 ---
 
+## Verifying the Secret Works
+
+1. Push any small change to `helm-demo-managed-k8s` branch
+2. Go to GitHub repo > **Actions** tab
+3. Click the running workflow **"Deploy to DOKS"**
+4. Click the **"Deploy"** job
+5. Expand **"Verify cluster connection"** step
+6. Confirm output shows:
+   - `Kubernetes control plane is running at https://<REDACTED_IP>`
+   - At least one node in `Ready` status
+7. If the step fails, check:
+   - `KUBE_CONFIG` secret name matches exactly (case sensitive)
+   - kubeconfig contents were pasted completely with no truncation
+   - DigitalOcean cluster is running and not paused
+   - kubeconfig has not expired (rotate if needed)
+
+---
+
 ## Security Warning
 
 - **NEVER** commit the kubeconfig file to the repo, even if gitignored. The

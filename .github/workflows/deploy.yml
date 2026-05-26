@@ -56,14 +56,24 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
 
-      # Step 4 — install Helm directly from the official helm.sh installer script.
-      - name: Install Helm
+      # Step 3b — verify kubeconfig is valid and cluster is reachable.
+      - name: Verify cluster connection
         run: |
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o get_helm.sh
-          chmod +x get_helm.sh
-          ./get_helm.sh
-          helm version
+          kubectl cluster-info
+          kubectl get nodes
 
-      # Step 5 — placeholder deploy step. Real `helm upgrade --install` commands go here later.
-      - name: Deploy
-        run: echo "Deploy step - coming soon"
+      # --- Steps below are temporarily disabled ---
+      # First pipeline run is scoped to verifying the cluster connection only.
+      # Uncomment Step 4 and Step 5 once "Verify cluster connection" succeeds in Actions.
+      #
+      # # Step 4 — install Helm directly from the official helm.sh installer script.
+      # - name: Install Helm
+      #   run: |
+      #     curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o get_helm.sh
+      #     chmod +x get_helm.sh
+      #     ./get_helm.sh
+      #     helm version
+      #
+      # # Step 5 — placeholder deploy step. Real `helm upgrade --install` commands go here later.
+      # - name: Deploy
+      #   run: echo "Deploy step - coming soon"
