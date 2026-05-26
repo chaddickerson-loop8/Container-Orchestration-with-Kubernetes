@@ -1,0 +1,69 @@
+# CI/CD pipeline for Module 16 — Helm Demo on DigitalOcean Managed Kubernetes (DOKS).
+# Kubeconfig is provided via the KUBE_CONFIG repo secret (never committed to the repo).
+name: Deploy to DOKS
+
+on:
+  # Manual-only trigger for now — the pipeline will NOT run on git push.
+  # Switch on the push trigger below when you're ready to enable auto-deploy.
+  workflow_dispatch:
+
+  # --- Auto-deploy trigger (disabled while scaffolding) ---
+  # Uncomment the block below when ready. It will fire on every push to the
+  # feature branch for this module. main is NEVER triggered directly — follows
+  # the branch strategy in .github/BRANCH-STRATEGY.md (feature -> k8s -> main).
+  #
+  # push:
+  #   branches:
+  #     - helm-demo-managed-k8s
+
+jobs:
+  # Placeholder build job — future steps will go here (e.g. docker build/push to a registry).
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build placeholder
+        run: echo "Build step - coming soon (docker build/push will go here)"
+
+  # Deploy job — authenticates against DOKS via kubeconfig from a GitHub Secret, then runs Helm.
+  # All tooling is installed directly from upstream (kubernetes.io, helm.sh) — no third-party,
+  # no Azure/AWS/GCP-specific actions.
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      # Step 1 — pull the repo so workflow can reference any manifests or Helm value files.
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2 — install kubectl directly from the official Kubernetes release server.
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          kubectl version --client
+
+      # Step 3 — write kubeconfig from the KUBE_CONFIG secret to ~/.kube/config.
+      # The secret value is the full contents of the DigitalOcean kubeconfig YAML.
+      - name: Configure kubeconfig from GitHub Secret
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      # Step 4 — install Helm directly from the official helm.sh installer script.
+      - name: Install Helm
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o get_helm.sh
+          chmod +x get_helm.sh
+          ./get_helm.sh
+          helm version
+
+      # Step 5 — placeholder deploy step. Real `helm upgrade --install` commands go here later.
+      - name: Deploy
+        run: echo "Deploy step - coming soon"

@@ -1,11 +1,25 @@
 # Progress Tracker — Kubernetes Bootcamp
 
 ## Current Session
-**Module 6 - YAML Configuration Files**
-- [ ] Create nginx-deployment.yaml
-- [ ] Apply YAML file
-- [ ] Update deployments with new values
-- [ ] Compare imperative vs declarative
+**Module 16 - Helm Demo — Stateful App on K8s** (IN PROGRESS)
+
+- **Branch:** `helm-demo-managed-k8s` (feature branch — see `.github/BRANCH-STRATEGY.md`)
+- **Cluster:** DigitalOcean Managed Kubernetes (DOKS) — `k8s-helm-demo`
+- **kubeconfig:** stored as GitHub Secret `KUBE_CONFIG` (not on disk, not in repo)
+
+### Notes
+- CI/CD workflow structure created locally.
+- Branch: `helm-demo-managed-k8s`.
+- kubeconfig stored as GitHub Secret: `KUBE_CONFIG`.
+
+### Checklist
+- [x] CI/CD workflow scaffolded (`.github/workflows/deploy.yml`, triggers on `helm-demo-managed-k8s`)
+- [x] Secret-setup instructions documented (`.github/README-secrets.md`)
+- [x] Branch strategy documented (`.github/BRANCH-STRATEGY.md`)
+- [ ] Add `KUBE_CONFIG` secret in GitHub repo settings
+- [ ] Wire up real Helm deploy steps (MongoDB replica set + Mongo Express + NGINX Ingress)
+- [ ] Verify deploy run against DOKS cluster `k8s-helm-demo`
+- [ ] Merge `helm-demo-managed-k8s` → `k8s` after module is complete
 
 ## All Modules
 
@@ -24,22 +38,21 @@
   - [x] Got shell of running container (kubectl exec)
   - [x] Deleted deployments
   - [x] Applied configuration file (declarative)
+- [x] Module 6 - YAML Configuration Files
+- [x] Module 7 - Demo — Deploy MongoDB & Mongo Express
+- [x] Module 10 - Ingress
+- [x] Module 12 - ConfigMap & Secret Volume Types
+- [x] Module 15 - Helm — Package Manager
 
 ### In Progress
-- [🔄] Module 6 - YAML Configuration Files
+- [🔄] Module 16 - Helm Demo — Stateful App on K8s (DigitalOcean DOKS via GitHub Actions)
 
 ### TODO
-- [ ] Module 6 - YAML Configuration Files
-- [ ] Module 7 - Demo — Deploy MongoDB & Mongo Express
 - [ ] Module 8 - Namespaces
 - [ ] Module 9 - Kubernetes Services
-- [ ] Module 10 - Ingress
 - [ ] Module 11 - Persisting Data with Volumes
-- [ ] Module 12 - ConfigMap & Secret Volume Types
 - [ ] Module 13 - StatefulSet — Deploying Stateful Apps
 - [ ] Module 14 - Managed Kubernetes Services
-- [ ] Module 15 - Helm — Package Manager
-- [ ] Module 16 - Helm Demo — Stateful App on K8s
 - [ ] Module 17 - Deploy App from Private Docker Registry
 - [ ] Module 18 - Extending K8s API with Operators
 - [ ] Module 19 - RBAC — Authorization & Security
@@ -51,5 +64,5 @@
 
 ---
 
-**Last Updated:** 2026-05-21  
-**Total Progress:** 5/24 modules (20.8%)
+**Last Updated:** 2026-05-26  
+**Total Progress:** 9/24 modules (37.5%)

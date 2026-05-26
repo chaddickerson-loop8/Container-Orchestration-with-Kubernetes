@@ -37,11 +37,13 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 ├── Screenshots/           # Screenshots referenced from README modules (per-module subfolders)
 │   ├── Module-07/
 │   │   └── mongo-express-external.png
-│   └── Module-10/
-│       ├── dashboard-first-access-1.png
-│       ├── dashboard-first-access-2.png
-│       ├── dashboard-first-access-3.png
-│       └── dashboard-after-portforward.png
+│   ├── Module-10/
+│   │   ├── dashboard-first-access-1.png
+│   │   ├── dashboard-first-access-2.png
+│   │   ├── dashboard-first-access-3.png
+│   │   └── dashboard-after-portforward.png
+│   ├── Module-12/
+│   └── Module-16/
 └── Documents/             # Reference documents
 ```
 
@@ -62,7 +64,7 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 - [x] Module 12: ConfigMap & Secret Volume Types
 - [ ] Module 13: StatefulSet — Deploying Stateful Apps
 - [ ] Module 14: Managed Kubernetes Services
-- [ ] Module 15: Helm — Package Manager
+- [x] Module 15: Helm — Package Manager
 - [ ] Module 16: Helm Demo — Stateful App on K8s
 - [ ] Module 17: Deploy App from Private Docker Registry
 - [ ] Module 18: Extending K8s API with Operators
@@ -1208,13 +1210,13 @@ Module 12 closes the gap from Module 7: **the same** ConfigMap and Secret primit
 ---
 
 ## Module 16: Helm Demo — Stateful App on K8s
-> *Deploy replicated MongoDB + MongoExpress + NGINX Ingress on a cloud cluster.*
+> *Deploy replicated MongoDB + MongoExpress + NGINX Ingress on a DigitalOcean managed Kubernetes cluster (DOKS).*
 
 ```bash
 # Commands will be added as each step is completed
 ```
 
-<!-- Steps: K8s cluster on Linode, MongoDB StatefulSet via Helm, MongoExpress, NGINX Ingress -->
+<!-- Steps: K8s cluster on DigitalOcean (DOKS), MongoDB StatefulSet via Helm, MongoExpress, NGINX Ingress -->
 
 ---
 
