@@ -1425,6 +1425,12 @@ kubectl get svc nginx-ingress-ingress-nginx-controller
 # Look at the EXTERNAL-IP column — open http://<that-ip> in a browser.
 ```
 
+**End-to-end proof — Mongo Express UI loaded in a browser via the public LoadBalancer IP:**
+
+![Mongo Express UI reachable at http://134.209.140.28 — connected to mongodb-0, MongoDB 8.3.2, 23 active connections](./Screenshots/Module-16/wait%20for%20LoadBalancer%20IP%20and%20surface%20it%20in%20the%20CI%20log.png)
+
+This is the full chain working: browser → DigitalOcean cloud LoadBalancer (`134.209.140.28`) → NGINX Ingress Controller pod → Ingress rule (`/` Prefix) → `mongo-express-service` ClusterIP → Mongo Express pod → MongoDB primary (`mongodb-0.mongodb-headless.default.svc.cluster.local:27017`) authenticated via the `mongodb-root-password` Secret. Server Status block (Hostname `mongodb-0`, 23 current connections) is live data pulled from the replica set in real time.
+
 ### Conclusion
 The Module 16 pipeline now stands up a complete MongoDB + Mongo Express stack on DOKS in a single push: cluster auth → Helm primed → MongoDB replica set (3 pods, DO block-storage volumes, root password from values) → Mongo Express UI wired up via secretKeyRef to the chart-generated Secret → NGINX Ingress Controller installed via its own Helm chart with a DigitalOcean LoadBalancer in front → public Ingress rule routing `/` to the UI — all inside the ephemeral GitHub Actions runner with no developer-laptop commands in the loop. The "deploy → verify rollout → check logs → expose via Ingress" structure means any DNS, auth, image-pull, or LoadBalancer provisioning issue surfaces in CI rather than as a silent broken stack. Next: confirm browser access to the LoadBalancer IP, capture screenshots, and close out Module 16 — leading into Module 17's private-registry work.
 

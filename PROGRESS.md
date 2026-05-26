@@ -46,8 +46,8 @@
 - [x] LoadBalancer IP assigned by DigitalOcean
 - [x] Mongo Express Ingress rule applied
 - [x] Ingress verified
-- [ ] Confirm external browser access to Mongo Express
-- [ ] Add screenshots of successful access
+- [x] Confirm external browser access to Mongo Express (`http://134.209.140.28` — run 26479921149)
+- [x] Add screenshots of successful access
 - [ ] Mark Module 16 COMPLETE
 - [ ] Verify deploy run against DOKS cluster `k8s-helm-demo`
 - [ ] Merge `helm-demo-managed-k8s` → `k8s` after module is complete
