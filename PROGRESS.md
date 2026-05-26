@@ -11,6 +11,7 @@
 - CI/CD workflow structure created locally.
 - Branch: `helm-demo-managed-k8s`.
 - kubeconfig stored as GitHub Secret: `KUBE_CONFIG`.
+- Pipeline success screenshot saved to `Screenshots/Module-16/` (per CLAUDE.md screenshot rule — task template referenced `docs/screenshots/module-16/` but project convention is `Screenshots/`).
 
 ### Checklist
 - [x] CI/CD workflow created (`.github/workflows/deploy.yml`, triggers on `helm-demo-managed-k8s`)

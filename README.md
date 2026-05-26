@@ -1213,7 +1213,38 @@ Module 12 closes the gap from Module 7: **the same** ConfigMap and Secret primit
 > *Deploy replicated MongoDB + MongoExpress + NGINX Ingress on a DigitalOcean managed Kubernetes cluster (DOKS).*
 
 ### Summary
-Module 16 leaves Minikube behind and moves the demo onto a real managed Kubernetes cluster (DigitalOcean DOKS — `k8s-helm-demo`) driven entirely by GitHub Actions. The first milestone — covered in this update — is wiring the CI/CD pipeline end-to-end and proving the runner can authenticate against the cluster before any Helm work runs. A dedicated feature branch (`helm-demo-managed-k8s`) holds the workflow, the kubeconfig is stored as the `KUBE_CONFIG` repo secret (never on disk, never committed), and a "Verify cluster connection" step fails fast if the secret is wrong or the cluster is unreachable. Helm install + deploy steps are scaffolded but commented out until the connection check is green.
+Module 16 leaves Minikube behind and moves the demo onto a real managed Kubernetes cluster (DigitalOcean DOKS — `k8s-helm-demo`) driven entirely by GitHub Actions. The first milestone — covered in this update — is wiring the CI/CD pipeline end-to-end and proving the runner can authenticate against the cluster before any Helm work runs. A dedicated feature branch (`helm-demo-managed-k8s`) holds the workflow, the kubeconfig is stored as the `KUBE_CONFIG` repo secret (never on disk, never committed), and a "Verify cluster connection" step fails fast if the secret is wrong or the cluster is unreachable. With the connection proven, the pipeline now also installs Helm, registers the Bitnami repo, and verifies the MongoDB chart is resolvable — all before the real deploy lands.
+
+**Status:** IN PROGRESS  
+**Platform:** DigitalOcean Managed Kubernetes (DOKS)  
+**Approach:** All operations run via GitHub Actions CI/CD pipeline
+
+### CI/CD Pipeline Setup
+- **Trigger:** push to `helm-demo-managed-k8s` branch (and `workflow_dispatch`)
+- **Runner:** `ubuntu-latest`
+
+### Pipeline Steps Completed
+| Step | Description | Status |
+|------|-------------|--------|
+| Checkout code | Pull repo to runner | ✅ |
+| Install kubectl | Set up kubectl on runner | ✅ |
+| Configure kubeconfig | Write KUBE_CONFIG secret to `~/.kube/config` | ✅ |
+| Verify cluster connection | `kubectl cluster-info` + `kubectl get nodes` | ✅ |
+| Set up Helm | Install Helm on runner | ✅ |
+| Verify Helm version | Confirm Helm installed correctly | ✅ |
+| Add Bitnami repo | `helm repo add bitnami` | ✅ |
+| Update Helm repos | `helm repo update` | ✅ |
+| Verify MongoDB chart | `helm search repo bitnami/mongodb` | ✅ |
+| Deploy placeholder | MongoDB Helm deploy coming next | 🔄 |
+
+### Screenshots
+![Helm Install Pipeline Success](./Screenshots/Module-16/Helm-iinstall-cicd-staus-sucess.png)
+
+### Next Steps
+- Deploy MongoDB StatefulSet via Helm
+- Configure data persistence
+- Deploy MongoExpress
+- Configure NGINX Ingress Controller
 
 ### Branch & Cluster Setup
 - **Feature branch:** `helm-demo-managed-k8s` — per [`.github/BRANCH-STRATEGY.md`](./.github/BRANCH-STRATEGY.md), feature work lands here first, then promotes `feature → k8s → main`. `main` is never targeted directly by the CI pipeline.
