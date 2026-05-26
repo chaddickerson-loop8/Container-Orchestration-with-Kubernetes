@@ -39,9 +39,16 @@
 - [x] Mongo Express rollout verified
 - [x] Mongo Express logs checked
 - [x] MongoDB connection confirmed via Mongo Express
-- [ ] Configure NGINX Ingress Controller (next step)
-- [ ] Configure Ingress rule
-- [ ] Test external access via browser
+- [x] helm-ingress.yaml created
+- [x] NGINX Ingress Controller Helm repo added to pipeline
+- [x] NGINX Ingress Controller installed via Helm
+- [x] Ingress Controller rollout verified
+- [x] LoadBalancer IP assigned by DigitalOcean
+- [x] Mongo Express Ingress rule applied
+- [x] Ingress verified
+- [ ] Confirm external browser access to Mongo Express
+- [ ] Add screenshots of successful access
+- [ ] Mark Module 16 COMPLETE
 - [ ] Verify deploy run against DOKS cluster `k8s-helm-demo`
 - [ ] Merge `helm-demo-managed-k8s` → `k8s` after module is complete
 

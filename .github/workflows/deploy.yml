@@ -89,7 +89,7 @@ jobs:
       - name: Deploy MongoDB via Helm
         run: |
           helm upgrade --install mongodb \
-            --values helm-mongodb.yaml \
+            --values K8S-Config-Files/helm/helm-mongodb.yaml \
             bitnami/mongodb
 
       # Step 11 — verify MongoDB pods are running
@@ -106,7 +106,7 @@ jobs:
 
       # Step 14 — deploy Mongo Express and its ClusterIP service
       - name: Deploy Mongo Express
-        run: kubectl apply -f helm-mongo-express.yaml
+        run: kubectl apply -f K8S-Config-Files/helm/helm-mongo-express.yaml
 
       # Step 15 — wait for Mongo Express pod to be ready
       - name: Wait for Mongo Express rollout
@@ -122,3 +122,45 @@ jobs:
       - name: Check Mongo Express logs
         run: |
           kubectl logs deployment/mongo-express
+
+      # Step 18 — add NGINX Ingress Controller Helm repo
+      - name: Add Ingress NGINX Helm repo
+        run: |
+          helm repo add ingress-nginx \
+            https://kubernetes.github.io/ingress-nginx
+
+      # Step 19 — update Helm repos
+      - name: Update Helm repos
+        run: helm repo update
+
+      # Step 20 — install (or upgrade) the NGINX Ingress Controller with
+      # publishService enabled so DigitalOcean assigns a LoadBalancer IP
+      # automatically. `upgrade --install` keeps re-runs idempotent — plain
+      # `install` would fail on the second push with "cannot re-use a name
+      # that is still in use", same trap that bit Step 10 earlier.
+      - name: Install NGINX Ingress Controller
+        run: |
+          helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx \
+            --set controller.publishService.enabled=true
+
+      # Step 21 — wait for Ingress Controller pods to be ready
+      - name: Wait for Ingress Controller rollout
+        run: |
+          kubectl rollout status deployment/nginx-ingress-ingress-nginx-controller \
+            --timeout=180s
+
+      # Step 22 — verify all pods running including Ingress Controller
+      - name: Verify pods
+        run: kubectl get pod
+
+      # Step 23 — get services to confirm LoadBalancer IP assigned
+      - name: Get services and LoadBalancer IP
+        run: kubectl get svc
+
+      # Step 24 — apply Ingress rule for Mongo Express
+      - name: Apply Mongo Express Ingress rule
+        run: kubectl apply -f K8S-Config-Files/helm/helm-ingress.yaml
+
+      # Step 25 — verify Ingress resource and access URL
+      - name: Verify Ingress
+        run: kubectl get ingress
