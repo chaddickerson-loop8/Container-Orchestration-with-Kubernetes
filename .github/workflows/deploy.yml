@@ -59,18 +59,29 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
-      # --- Steps below are temporarily disabled ---
-      # First pipeline run is scoped to verifying the cluster connection only.
-      # Uncomment Step 4 and Step 5 once "Verify cluster connection" succeeds in Actions.
-      #
-      # # Step 4 — install Helm directly from the official helm.sh installer script.
-      # - name: Install Helm
-      #   run: |
-      #     curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o get_helm.sh
-      #     chmod +x get_helm.sh
-      #     ./get_helm.sh
-      #     helm version
-      #
-      # # Step 5 — placeholder deploy step. Real `helm upgrade --install` commands go here later.
-      # - name: Deploy
-      #   run: echo "Deploy step - coming soon"
+      # Step 4 — install Helm directly from the official helm.sh installer script.
+      - name: Set up Helm
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o get_helm.sh
+          chmod +x get_helm.sh
+          ./get_helm.sh
+
+      # Step 4b — confirm Helm is installed.
+      - name: Verify Helm version
+        run: helm version
+
+      # Step 5 — add Bitnami Helm repository on the runner
+      - name: Add Bitnami Helm repository
+        run: helm repo add bitnami https://charts.bitnami.com/bitnami
+
+      # Step 6 — update Helm repos to pull latest chart versions
+      - name: Update Helm repositories
+        run: helm repo update
+
+      # Step 7 — confirm MongoDB chart is available before deploying
+      - name: Verify MongoDB chart available
+        run: helm search repo bitnami/mongodb
+
+      # Step 8 — MongoDB Helm deploy coming next step
+      - name: Deploy
+        run: echo "MongoDB Helm deploy - coming next step"

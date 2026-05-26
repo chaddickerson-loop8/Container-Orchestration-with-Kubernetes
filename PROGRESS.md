@@ -13,15 +13,16 @@
 - kubeconfig stored as GitHub Secret: `KUBE_CONFIG`.
 
 ### Checklist
-- [x] CI/CD workflow scaffolded (`.github/workflows/deploy.yml`, triggers on `helm-demo-managed-k8s`)
-- [x] Secret-setup instructions documented (`.github/README-secrets.md`)
+- [x] CI/CD workflow created (`.github/workflows/deploy.yml`, triggers on `helm-demo-managed-k8s`)
 - [x] Branch strategy documented (`.github/BRANCH-STRATEGY.md`)
-- [x] CI/CD workflow created
-- [x] KUBE_CONFIG secret instructions documented
-- [x] Cluster verification step added to workflow
-- [x] Verify cluster connection confirmed in Actions (run 26474393325 / commit f57aae9)
-- [ ] Add `KUBE_CONFIG` secret in GitHub repo settings
-- [ ] Wire up real Helm deploy steps (MongoDB replica set + Mongo Express + NGINX Ingress)
+- [x] KUBE_CONFIG secret instructions documented (`.github/README-secrets.md`)
+- [x] KUBE_CONFIG secret configured in GitHub repo settings
+- [x] Cluster verification step added (run 26474393325 / commit f57aae9)
+- [x] Helm install step activated in pipeline
+- [x] Bitnami repository added to pipeline
+- [x] Helm repo update added to pipeline
+- [x] MongoDB chart verification added to pipeline
+- [ ] Deploy MongoDB StatefulSet via Helm (next step)
 - [ ] Verify deploy run against DOKS cluster `k8s-helm-demo`
 - [ ] Merge `helm-demo-managed-k8s` → `k8s` after module is complete
 

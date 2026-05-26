@@ -1269,27 +1269,25 @@ pool-k8s-helm-demo-38e5sd   Ready    <none>   89m   v1.36.0
 
 This confirms three things at once: the `KUBE_CONFIG` secret was written to the runner correctly, `kubectl` can authenticate against the DOKS API, and the cluster is reachable from GitHub-hosted runners.
 
-### Helm Steps — Deferred
-The `Install Helm` and `Deploy` steps are intentionally commented out in `deploy.yml` until the connection check is proven green. The scaffold:
+### Step 3: Helm Setup and Bitnami Repository via CI/CD Pipeline
+With the cluster connection proven, the pipeline now installs Helm directly on the runner and primes the Bitnami chart repository — the source of the MongoDB chart used in the next step. **All Helm operations run inside the GitHub Actions runner** — Helm is never installed on a developer machine, and no Helm state lives outside the workflow run (every run is ephemeral, so `helm repo add` + `helm repo update` are re-run each time).
 
-```yaml
-# # Step 4 — install Helm directly from the official helm.sh installer script.
-# - name: Install Helm
-#   run: |
-#     curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o get_helm.sh
-#     chmod +x get_helm.sh
-#     ./get_helm.sh
-#     helm version
-#
-# # Step 5 — placeholder deploy step. Real `helm upgrade --install` commands go here later.
-# - name: Deploy
-#   run: echo "Deploy step - coming soon"
-```
+**Final deploy job step order:**
+1. **Checkout code** — pulls the repo so the workflow can reference local manifests or values files.
+2. **Install kubectl** — fetches the latest stable `kubectl` from the official Kubernetes release server.
+3. **Configure kubeconfig from GitHub Secret** — writes `${{ secrets.KUBE_CONFIG }}` to `$HOME/.kube/config` with `chmod 600`.
+4. **Verify cluster connection** — `kubectl cluster-info` + `kubectl get nodes` to fail fast on a bad/expired kubeconfig before any Helm work runs.
+5. **Set up Helm** — installs Helm 3 via the official `get-helm-3` script from `helm.sh`.
+6. **Verify Helm version** — runs `helm version` to confirm the install succeeded.
+7. **Add Bitnami Helm repository** — `helm repo add bitnami https://charts.bitnami.com/bitnami` registers the chart source on the runner.
+8. **Update Helm repositories** — `helm repo update` pulls the latest chart index from Bitnami.
+9. **Verify MongoDB chart available** — `helm search repo bitnami/mongodb` confirms the chart is resolvable before any deploy.
+10. **Deploy placeholder** — `echo "MongoDB Helm deploy - coming next step"` — replaced with the real `helm upgrade --install` in the next step.
 
-Real `helm upgrade --install` commands for MongoDB (replicated StatefulSet), Mongo Express, and NGINX Ingress will replace the placeholder once Helm is uncommented.
+> **Note:** All Helm operations run inside the GitHub Actions runner. Each pipeline run is ephemeral — there is no persistent Helm state between runs, so the repo-add / repo-update / chart-search steps re-execute on every push.
 
 ### Conclusion
-The Module 16 pipeline is live: every push to `helm-demo-managed-k8s` now authenticates against DOKS and verifies the cluster is reachable before any deploy work runs. The "connection-check first" structure means a bad kubeconfig fails in seconds with a readable error instead of halfway through a Helm release. With CI plumbing proven, the next step is to uncomment the Helm install + deploy steps and bring up the MongoDB replica set, Mongo Express, and NGINX Ingress on the real cluster — leading directly into Module 17's private-registry work.
+The Module 16 pipeline is live and Helm-aware: every push to `helm-demo-managed-k8s` now authenticates against DOKS, verifies the cluster, installs Helm fresh on the runner, registers Bitnami, and confirms the MongoDB chart is resolvable — all before any deploy runs. The "connection-check first, then chart-availability-check" structure means a bad kubeconfig *or* a missing chart fails in seconds with a readable error instead of halfway through a release. Next step: replace the deploy placeholder with `helm upgrade --install` against the Bitnami MongoDB chart (replicated StatefulSet), then layer Mongo Express + NGINX Ingress on top — leading directly into Module 17's private-registry work.
 
 ---
 
