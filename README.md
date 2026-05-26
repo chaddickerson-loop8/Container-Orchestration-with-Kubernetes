@@ -1247,10 +1247,12 @@ Module 16 leaves Minikube behind and moves the demo onto a real managed Kubernet
 | Update Helm repos | `helm repo update` | ✅ |
 | Install NGINX Ingress Controller | `helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.publishService.enabled=true` | ✅ |
 | Wait for Ingress Controller rollout | `kubectl rollout status deployment/nginx-ingress-ingress-nginx-controller --timeout=180s` | ✅ |
+| Wait for LoadBalancer IP | `kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].ip}' svc/nginx-ingress-ingress-nginx-controller --timeout=300s` | ✅ |
 | Verify pods | `kubectl get pod` | ✅ |
 | Get services and LoadBalancer IP | `kubectl get svc` | ✅ |
 | Apply Mongo Express Ingress rule | `kubectl apply -f K8S-Config-Files/helm/helm-ingress.yaml` | ✅ |
 | Verify Ingress | `kubectl get ingress` | ✅ |
+| Print Mongo Express access URL | `echo "http://$(kubectl get svc nginx-ingress-ingress-nginx-controller -o jsonpath=...)"` | ✅ |
 
 ### Next Steps
 - Confirm external browser access to Mongo Express
@@ -1402,21 +1404,25 @@ With the ClusterIP-only Mongo Express UI running, the last step is to make it re
 18. **Add Ingress NGINX Helm repo** — `helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx` registers the official upstream chart source.
 19. **Update Helm repos** — `helm repo update` refreshes the chart index so the next step pulls the latest controller release.
 20. **Install NGINX Ingress Controller** — `helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.publishService.enabled=true` installs (or upgrades) the controller. `upgrade --install` keeps the step idempotent across pushes — same idempotency pattern used for the MongoDB release in Step 10. `publishService.enabled=true` makes the controller publish the LoadBalancer's external address back into Ingress `status.loadBalancer` so downstream tooling can read the public IP.
-21. **Wait for Ingress Controller rollout** — `kubectl rollout status deployment/nginx-ingress-ingress-nginx-controller --timeout=180s` blocks until the controller pods are Ready. 180s is generous because DO needs time to provision the LoadBalancer.
+21. **Wait for Ingress Controller rollout** — `kubectl rollout status deployment/nginx-ingress-ingress-nginx-controller --timeout=180s` blocks until the controller *pods* are Ready. Pods Ready ≠ cloud LoadBalancer provisioned, which is why the next step exists.
+21b. **Wait for LoadBalancer IP** — `kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].ip}' svc/nginx-ingress-ingress-nginx-controller --timeout=300s` blocks until DigitalOcean finishes provisioning the cloud LoadBalancer and populates `status.loadBalancer.ingress[0].ip`. Without this, the verify steps below race the LB provisioner and see `<pending>` (DO typically takes 1–3 minutes).
 22. **Verify pods** — `kubectl get pod` confirms the controller pod is `Running` alongside the MongoDB + Mongo Express pods.
 23. **Get services and LoadBalancer IP** — `kubectl get svc` surfaces the `nginx-ingress-ingress-nginx-controller` Service with its `EXTERNAL-IP` populated by DigitalOcean — that's the public address.
 24. **Apply Mongo Express Ingress rule** — `kubectl apply -f K8S-Config-Files/helm/helm-ingress.yaml` registers the `/` → `mongo-express-service:8081` route with the controller.
 25. **Verify Ingress** — `kubectl get ingress` confirms the rule is registered and surfaces the bound `ADDRESS` (the same LoadBalancer IP) for the Ingress object.
+26. **Print Mongo Express access URL** — reads `status.loadBalancer.ingress[0].ip` back off the controller Service and echoes `Mongo Express is reachable at: http://<LB-IP>` so the public URL is visible directly in the CI log — no local `kubectl` required to find it.
 
 > ⚠️ **Deprecation note:** `kubernetes.io/ingress.class` annotation is deprecated. Modern clusters prefer `spec.ingressClassName: nginx`. Safe for demo, but update before production use.
 
 **Accessing Mongo Express externally:**
+The pipeline's final step (`Print Mongo Express access URL`) echoes the public URL into the CI log — just open the linked workflow run and grab it from the log line:
+```
+Mongo Express is reachable at: http://<LB-IP>
+```
+Or query it locally if you have the DOKS kubeconfig:
 ```bash
-# After the pipeline run, get the public LoadBalancer IP:
-kubectl get svc
-# Look at the EXTERNAL-IP column on `nginx-ingress-ingress-nginx-controller`.
-# Then open the UI in a browser:
-#   http://<EXTERNAL-IP>
+kubectl get svc nginx-ingress-ingress-nginx-controller
+# Look at the EXTERNAL-IP column — open http://<that-ip> in a browser.
 ```
 
 ### Conclusion
