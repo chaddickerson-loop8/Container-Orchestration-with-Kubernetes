@@ -1,7 +1,9 @@
 # Progress Tracker — Kubernetes Bootcamp
 
 ## Current Session
-**Module 16 - Helm Demo — Stateful App on K8s** (IN PROGRESS)
+**Module 16 - Helm Demo — Stateful App on K8s** ✅ COMPLETE
+
+**Next up:** Module 17 - Deploy App from Private Docker Registry
 
 - **Branch:** `helm-demo-managed-k8s` (feature branch — see `.github/BRANCH-STRATEGY.md`)
 - **Cluster:** DigitalOcean Managed Kubernetes (DOKS) — `k8s-helm-demo`
@@ -48,8 +50,16 @@
 - [x] Ingress verified
 - [x] Confirm external browser access to Mongo Express (`http://134.209.140.28` — run 26479921149)
 - [x] Add screenshots of successful access
-- [ ] Mark Module 16 COMPLETE
-- [ ] Verify deploy run against DOKS cluster `k8s-helm-demo`
+- [x] MongoDB scaled down to 0 replicas — shutdown simulated
+- [x] Pod termination verified
+- [x] MongoDB scaled back to 3 replicas
+- [x] MongoDB rollout verified after scale up
+- [x] All pods confirmed running after restore
+- [x] All Helm releases listed and verified
+- [x] MongoDB Helm release uninstalled
+- [x] All 32 pipeline steps documented
+- [x] Module 16 summary added to README
+- [x] Mark Module 16 COMPLETE
 - [ ] Merge `helm-demo-managed-k8s` → `k8s` after module is complete
 
 ## All Modules
@@ -74,9 +84,10 @@
 - [x] Module 10 - Ingress
 - [x] Module 12 - ConfigMap & Secret Volume Types
 - [x] Module 15 - Helm — Package Manager
+- [x] Module 16 - Helm Demo — Stateful App on K8s (DigitalOcean DOKS via GitHub Actions, 32-step pipeline)
 
 ### In Progress
-- [🔄] Module 16 - Helm Demo — Stateful App on K8s (DigitalOcean DOKS via GitHub Actions)
+- [ ] Module 17 - Deploy App from Private Docker Registry
 
 ### TODO
 - [ ] Module 8 - Namespaces
@@ -84,7 +95,6 @@
 - [ ] Module 11 - Persisting Data with Volumes
 - [ ] Module 13 - StatefulSet — Deploying Stateful Apps
 - [ ] Module 14 - Managed Kubernetes Services
-- [ ] Module 17 - Deploy App from Private Docker Registry
 - [ ] Module 18 - Extending K8s API with Operators
 - [ ] Module 19 - RBAC — Authorization & Security
 - [ ] Module 20 - Microservices in Kubernetes
@@ -96,4 +106,4 @@
 ---
 
 **Last Updated:** 2026-05-26  
-**Total Progress:** 9/24 modules (37.5%)
+**Total Progress:** 10/24 modules (41.7%)

@@ -92,6 +92,14 @@ jobs:
             --values K8S-Config-Files/helm/helm-mongodb.yaml \
             bitnami/mongodb
 
+      # Step 10b — wait for the MongoDB StatefulSet to fully roll out before
+      # any verify / dependent steps look at it. Without this, `kubectl get`
+      # races the pod scheduler and the verify steps capture Pending pods.
+      - name: Wait for MongoDB rollout
+        run: |
+          kubectl rollout status statefulset/mongodb \
+            --timeout=300s
+
       # Step 11 — verify MongoDB pods are running
       - name: Verify MongoDB pods
         run: kubectl get pod
@@ -175,11 +183,34 @@ jobs:
       - name: Verify Ingress
         run: kubectl get ingress
 
-      # Step 26 — read the assigned LoadBalancer IP back out of the controller
-      # Service and print the public Mongo Express access URL so it's visible
-      # directly in the CI log (no local kubectl needed to find it).
-      - name: Print Mongo Express access URL
+      # Step 26 — scale MongoDB StatefulSet down to 0
+      # simulates shutdown to test resilience and persistence
+      - name: Scale MongoDB down to zero
+        run: kubectl scale --replicas=0 statefulset/mongodb
+
+      # Step 27 — verify MongoDB pods terminated successfully
+      - name: Verify pods after scale down
+        run: kubectl get pod
+
+      # Step 28 — scale MongoDB StatefulSet back up to 3 replicas
+      - name: Scale MongoDB back to 3 replicas
+        run: kubectl scale --replicas=3 statefulset/mongodb
+
+      # Step 29 — wait for MongoDB to be fully Ready after scale up
+      - name: Wait for MongoDB rollout after scale up
         run: |
-          LB_IP=$(kubectl get svc nginx-ingress-ingress-nginx-controller \
-            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          echo "Mongo Express is reachable at: http://${LB_IP}"
+          kubectl rollout status statefulset/mongodb \
+            --timeout=300s
+
+      # Step 30 — verify all pods running after restore
+      - name: Verify pods after scale up
+        run: kubectl get pod
+
+      # Step 31 — list all installed Helm releases
+      - name: List Helm releases
+        run: helm ls
+
+      # Step 32 — uninstall MongoDB Helm release
+      # cleans up all MongoDB resources from the cluster
+      - name: Uninstall MongoDB Helm release
+        run: helm uninstall mongodb
