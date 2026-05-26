@@ -100,3 +100,22 @@ jobs:
       # Step 13 — verify MongoDB secrets were created
       - name: Verify MongoDB secrets
         run: kubectl get secret
+
+      # Step 14 — deploy Mongo Express and its ClusterIP service
+      - name: Deploy Mongo Express
+        run: kubectl apply -f helm-mongo-express.yaml
+
+      # Step 15 — wait for Mongo Express pod to be ready
+      - name: Wait for Mongo Express rollout
+        run: |
+          kubectl rollout status deployment/mongo-express \
+            --timeout=120s
+
+      # Step 16 — verify Mongo Express pod is running
+      - name: Verify Mongo Express pod
+        run: kubectl get pod
+
+      # Step 17 — check Mongo Express logs for successful connection
+      - name: Check Mongo Express logs
+        run: |
+          kubectl logs deployment/mongo-express

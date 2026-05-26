@@ -34,9 +34,14 @@
 - [x] MongoDB pods verified
 - [x] All Kubernetes resources verified
 - [x] MongoDB secrets verified
-- [ ] Deploy MongoExpress (next step)
-- [ ] Configure NGINX Ingress Controller
+- [x] helm-mongo-express.yaml created
+- [x] Mongo Express deployed via kubectl apply
+- [x] Mongo Express rollout verified
+- [x] Mongo Express logs checked
+- [x] MongoDB connection confirmed via Mongo Express
+- [ ] Configure NGINX Ingress Controller (next step)
 - [ ] Configure Ingress rule
+- [ ] Test external access via browser
 - [ ] Verify deploy run against DOKS cluster `k8s-helm-demo`
 - [ ] Merge `helm-demo-managed-k8s` → `k8s` after module is complete
 

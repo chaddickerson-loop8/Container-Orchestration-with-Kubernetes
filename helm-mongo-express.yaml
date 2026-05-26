@@ -1,0 +1,119 @@
+# Mongo Express Deployment + ClusterIP Service — Module 16 Step 5.
+# Applied by `kubectl apply -f helm-mongo-express.yaml` in the GitHub Actions runner.
+# Connects to the Helm-deployed MongoDB replica set via the chart's headless service
+# and reads the root password from the Helm-generated `mongodb` Secret.
+
+apiVersion: apps/v1
+# ✅ What it does: pins this manifest to the apps/v1 API group (the GA group for Deployments).
+# 🧠 Why it matters: API groups gate which fields the API server accepts — drift to a different group breaks the apply.
+# 🌍 DevOps/Cloud: apps/v1 is universally stable across cloud-managed K8s (EKS/GKE/AKS/DOKS) since 1.9.
+
+kind: Deployment
+# ✅ What it does: declares this object as a Deployment (rolling-update-capable Pod controller).
+# 🧠 Why it matters: Deployments add ReplicaSet management + revision history that bare Pods don't have.
+# 🌍 DevOps/Cloud: Deployment is the standard stateless-workload primitive — what every CD pipeline targets.
+
+metadata:
+  name: mongo-express
+  # ✅ What it does: names the Deployment `mongo-express` in the current namespace (`default`).
+  # 🧠 Why it matters: this name is how kubectl, logs, rollout commands, and Services target the object.
+  # 🌍 DevOps/Cloud: names must be DNS-1123-compatible (lowercase + hyphens) since they become DNS labels.
+
+  labels:
+    app: mongo-express
+    # ✅ What it does: tags the Deployment object itself with `app=mongo-express`.
+    # 🧠 Why it matters: labels are how Services, NetworkPolicies, and operators discover related objects.
+    # 🌍 DevOps/Cloud: standard convention — every workload in a fleet wires up via `app=<name>` labels.
+
+spec:
+  replicas: 1
+  # ✅ What it does: runs a single Mongo Express pod.
+  # 🧠 Why it matters: 1 replica is fine for a demo admin UI — the database itself is HA, the UI doesn't need to be.
+  # 🌍 DevOps/Cloud: production admin UIs typically run ≥2 replicas — this is a deliberate Module 22 BP7 gap.
+
+  selector:
+    matchLabels:
+      app: mongo-express
+      # ✅ What it does: tells the Deployment which Pods belong to it (anything labeled `app=mongo-express`).
+      # 🧠 Why it matters: selector mismatch is the classic "Deployment runs but no pods come up" footgun.
+      # 🌍 DevOps/Cloud: selectors are immutable after creation — changing one requires delete + recreate.
+
+  template:
+    metadata:
+      labels:
+        app: mongo-express
+        # ✅ What it does: stamps every Pod the Deployment creates with `app=mongo-express`.
+        # 🧠 Why it matters: must match `spec.selector.matchLabels` above AND the Service's selector below.
+        # 🌍 DevOps/Cloud: this label is the single common key threading Deployment → Pod → Service.
+
+    spec:
+      containers:
+      - name: mongo-express
+        # ✅ What it does: names the container inside the Pod (used by `kubectl logs` / `exec`).
+        # 🧠 Why it matters: in multi-container pods you need this name to target a specific container.
+        # 🌍 DevOps/Cloud: convention is to match the Deployment name for single-container pods.
+
+        image: mongo-express
+        # ✅ What it does: pulls the official `mongo-express` image from Docker Hub (defaults to `:latest`).
+        # 🧠 Why it matters: no version tag = floating `latest` = breaks reproducibility (Module 22 BP1 violation).
+        # 🌍 DevOps/Cloud: production must pin a digest or version tag — `:latest` also defeats K8s image caching.
+
+        ports:
+        - containerPort: 8081
+          # ✅ What it does: declares the container listens on TCP 8081 (Mongo Express UI port).
+          # 🧠 Why it matters: this is documentation/metadata — the actual bind is done by the app inside the container.
+          # 🌍 DevOps/Cloud: documenting ports here helps Service.targetPort + NetworkPolicy authoring downstream.
+
+        env:
+        - name: ME_CONFIG_MONGODB_ADMINUSERNAME
+          value: root
+          # ✅ What it does: tells Mongo Express which MongoDB user to authenticate as (`root`).
+          # 🧠 Why it matters: must match the user the Bitnami chart created — `root` is the chart default.
+          # 🌍 DevOps/Cloud: usernames aren't sensitive — fine to inline as `value`; passwords are not.
+
+        - name: ME_CONFIG_MONGODB_SERVER
+          value: mongodb-0.mongodb-headless
+          # ✅ What it does: tells Mongo Express to reach the primary replica via its stable headless-service DNS name.
+          # 🧠 Why it matters: hitting a specific replica avoids load-balancer round-robin and finds the writable primary.
+          # 🌍 DevOps/Cloud: `<pod>.<headless-svc>` DNS is how StatefulSets give pods stable, addressable identities.
+
+        - name: ME_CONFIG_MONGODB_ADMINPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb
+              key: mongodb-root-password
+              # ✅ What it does: reads the password from the `mongodb` Secret's `mongodb-root-password` key at runtime.
+              # 🧠 Why it matters: secrets never appear in the manifest, the image, or `kubectl describe` env output.
+              # 🌍 DevOps/Cloud: secretKeyRef is the canonical way to wire app credentials without baking them into images.
+
+---
+apiVersion: v1
+# ✅ What it does: pins the Service object to the core v1 API group.
+# 🧠 Why it matters: Services predate apps/v1 and still live in the legacy core group.
+# 🌍 DevOps/Cloud: same group across every managed K8s — Service has been stable since the earliest versions.
+
+kind: Service
+# ✅ What it does: declares this object as a Kubernetes Service (stable virtual IP + DNS in front of Pods).
+# 🧠 Why it matters: Pods come and go; the Service is the stable address other workloads talk to.
+# 🌍 DevOps/Cloud: Services are how every cloud K8s exposes workloads internally — Ingress builds on top.
+
+metadata:
+  name: mongo-express-service
+  # ✅ What it does: names the Service `mongo-express-service` (in-cluster DNS: `mongo-express-service.default`).
+  # 🧠 Why it matters: this is the DNS name `kubectl port-forward` and any Ingress rule will reference.
+  # 🌍 DevOps/Cloud: full FQDN is `<svc>.<ns>.svc.cluster.local` everywhere K8s runs.
+
+spec:
+  selector:
+    app: mongo-express
+    # ✅ What it does: routes traffic to every Pod labeled `app=mongo-express`.
+    # 🧠 Why it matters: the selector binds the Service to the Deployment's Pods — mismatch = empty Endpoints.
+    # 🌍 DevOps/Cloud: a Service without matching Pods is silently broken — `kubectl get endpoints` is the debug.
+
+  ports:
+  - protocol: TCP
+    port: 8081
+    targetPort: 8081
+    # ✅ What it does: forwards TCP 8081 on the Service ClusterIP to TCP 8081 inside the matching Pods.
+    # 🧠 Why it matters: `port` is the Service's listening port; `targetPort` is the container port.
+    # 🌍 DevOps/Cloud: omitting `type:` defaults to ClusterIP — internal-only, unreachable from outside the cluster.

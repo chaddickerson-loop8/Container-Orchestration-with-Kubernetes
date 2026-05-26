@@ -1239,11 +1239,15 @@ Module 16 leaves Minikube behind and moves the demo onto a real managed Kubernet
 | Verify MongoDB pods | `kubectl get pod` | ✅ |
 | Verify all resources | `kubectl get all` | ✅ |
 | Verify MongoDB secrets | `kubectl get secret` | ✅ |
+| Deploy Mongo Express | `kubectl apply -f helm-mongo-express.yaml` | ✅ |
+| Wait for Mongo Express rollout | `kubectl rollout status deployment/mongo-express --timeout=120s` | ✅ |
+| Verify Mongo Express pod | `kubectl get pod` | ✅ |
+| Check Mongo Express logs | `kubectl logs deployment/mongo-express` | ✅ |
 
 ### Next Steps
-- Deploy MongoExpress
 - Configure NGINX Ingress Controller
 - Configure Ingress rule
+- Test external access via browser
 
 ### Branch & Cluster Setup
 - **Feature branch:** `helm-demo-managed-k8s` — per [`.github/BRANCH-STRATEGY.md`](./.github/BRANCH-STRATEGY.md), feature work lands here first, then promotes `feature → k8s → main`. `main` is never targeted directly by the CI pipeline.
@@ -1344,8 +1348,32 @@ With Helm primed and the Bitnami MongoDB chart resolvable, the pipeline now perf
 
 > ⚠️ **Security note:** `rootPassword` in `helm-mongodb.yaml` is for **demo purposes only**. In production, use GitHub Secrets (or a secrets manager like Vault / AWS Secrets Manager) and reference them via `--set` or sealed values. **Never commit real passwords to the repo.**
 
+### Step 5: Web UI Setup for MongoDB Using Mongo Express and Secrets
+With the MongoDB replica set live on DOKS, the pipeline now layers [Mongo Express](https://github.com/mongo-express/mongo-express) — a web-based MongoDB admin UI — on top, defined by [`helm-mongo-express.yaml`](./helm-mongo-express.yaml) at the repo root. Mongo Express authenticates against MongoDB as `root`, reading the password at runtime from the same `mongodb` Secret that the Bitnami chart created in Step 4 — so the credential never appears in the manifest, the image, or any committed file.
+
+| Item | Value |
+|------|-------|
+| Service Type | `ClusterIP` (internal only) |
+| Container Port | `8081` |
+| Auth Method | Kubernetes Secret (`mongodb-root-password`) |
+| MongoDB Server | `mongodb-0.mongodb-headless` |
+
+**Pipeline steps 14–17 (added on top of the Step 4 sequence):**
+14. **Deploy Mongo Express** — `kubectl apply -f helm-mongo-express.yaml` creates the Deployment + ClusterIP Service in the `default` namespace.
+15. **Wait for Mongo Express rollout** — `kubectl rollout status deployment/mongo-express --timeout=120s` blocks until the pod reaches Ready, so the next steps see a real running container.
+16. **Verify Mongo Express pod** — `kubectl get pod` confirms `mongo-express-<hash>` is `1/1 Running` alongside the MongoDB replica-set pods.
+17. **Check Mongo Express logs** — `kubectl logs deployment/mongo-express` surfaces the "Mongo Express server listening at http://0.0.0.0:8081" + DB-connect lines so a failed auth or DNS lookup shows up loud in CI.
+
+**Local access via port-forward (development/verification only):**
+```bash
+kubectl port-forward service/mongo-express-service 8081:8081
+# Then open: http://localhost:8081
+```
+
+> ⚠️ **Security note:** Service is `ClusterIP` — only accessible inside the cluster. Port-forward is for development/verification only. External access will be configured via Ingress in the next step.
+
 ### Conclusion
-The Module 16 pipeline now does a full end-to-end Helm deploy: every push to `helm-demo-managed-k8s` authenticates against DOKS, primes Helm + Bitnami, installs the MongoDB replica set (3 pods, DO block-storage volumes, custom root password), and verifies pods + resources + secrets — all inside the ephemeral GitHub Actions runner with no developer-laptop steps in the loop. The "connection-check → chart-check → deploy → verify" structure means any failure surfaces with a focused error message instead of halfway through a release. Next: layer Mongo Express on top of the running replica set, then expose it via NGINX Ingress — leading into Module 17's private-registry work.
+The Module 16 pipeline now stands up a complete MongoDB + Mongo Express stack on DOKS in a single push: cluster auth → Helm primed → MongoDB replica set (3 pods, DO block-storage volumes, root password from values) → Mongo Express UI wired up via secretKeyRef to the chart-generated Secret → rollout + logs verified — all inside the ephemeral GitHub Actions runner with no developer-laptop commands in the loop. The "deploy then verify rollout then check logs" structure means any auth, DNS, or image issue surfaces in CI rather than as a silent broken UI. Next: install the NGINX Ingress Controller and route external traffic to `mongo-express-service` via an Ingress rule — leading into Module 17's private-registry work.
 
 ---
 
