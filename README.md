@@ -1364,6 +1364,12 @@ With the MongoDB replica set live on DOKS, the pipeline now layers [Mongo Expres
 16. **Verify Mongo Express pod** — `kubectl get pod` confirms `mongo-express-<hash>` is `1/1 Running` alongside the MongoDB replica-set pods.
 17. **Check Mongo Express logs** — `kubectl logs deployment/mongo-express` surfaces the "Mongo Express server listening at http://0.0.0.0:8081" + DB-connect lines so a failed auth or DNS lookup shows up loud in CI.
 
+**Pipeline success — Mongo Express applied, rolled out, and verified against the running MongoDB replica set (after the `helm upgrade --install` idempotency fix):**
+
+![Mongo Express deploy + rollout + verify steps green after Helm upgrade --install fix](./Screenshots/Module-16/make%20Helm%20MongoDB%20deploy%20idempotent%20in%20CICD.png)
+
+> **Note on the log output visible above:** the `mongo:27017` DNS-resolution failure is the official `mongo-express` image's entrypoint doing a TCP wait against a **hardcoded** `mongo` hostname (it doesn't honor `ME_CONFIG_MONGODB_SERVER` for the wait — only for the actual app config). The entrypoint moves on after the wait fails, and the app then connects via the env vars we set. Because the manifest currently has no readinessProbe, `kubectl rollout status` reports success the moment the container starts, not when the UI is actually serving — a Module 22 BP3 gap to close in a later iteration.
+
 **Local access via port-forward (development/verification only):**
 ```bash
 kubectl port-forward service/mongo-express-service 8081:8081
