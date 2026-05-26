@@ -3,18 +3,15 @@
 name: Deploy to DOKS
 
 on:
-  # Manual-only trigger for now — the pipeline will NOT run on git push.
-  # Switch on the push trigger below when you're ready to enable auto-deploy.
+  # Manual trigger — usable once the workflow file lands on the default branch.
   workflow_dispatch:
 
-  # --- Auto-deploy trigger (disabled while scaffolding) ---
-  # Uncomment the block below when ready. It will fire on every push to the
-  # feature branch for this module. main is NEVER triggered directly — follows
-  # the branch strategy in .github/BRANCH-STRATEGY.md (feature -> k8s -> main).
-  #
-  # push:
-  #   branches:
-  #     - helm-demo-managed-k8s
+  # Auto-deploy trigger — fires on every push to the module's feature branch.
+  # main is NEVER triggered directly — follows the branch strategy in
+  # .github/BRANCH-STRATEGY.md (feature -> k8s -> main).
+  push:
+    branches:
+      - helm-demo-managed-k8s
 
 jobs:
   # Placeholder build job — future steps will go here (e.g. docker build/push to a registry).
