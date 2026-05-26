@@ -37,11 +37,13 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 ├── Screenshots/           # Screenshots referenced from README modules (per-module subfolders)
 │   ├── Module-07/
 │   │   └── mongo-express-external.png
-│   └── Module-10/
-│       ├── dashboard-first-access-1.png
-│       ├── dashboard-first-access-2.png
-│       ├── dashboard-first-access-3.png
-│       └── dashboard-after-portforward.png
+│   ├── Module-10/
+│   │   ├── dashboard-first-access-1.png
+│   │   ├── dashboard-first-access-2.png
+│   │   ├── dashboard-first-access-3.png
+│   │   └── dashboard-after-portforward.png
+│   ├── Module-12/
+│   └── Module-16/
 └── Documents/             # Reference documents
 ```
 
@@ -62,7 +64,7 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 - [x] Module 12: ConfigMap & Secret Volume Types
 - [ ] Module 13: StatefulSet — Deploying Stateful Apps
 - [ ] Module 14: Managed Kubernetes Services
-- [ ] Module 15: Helm — Package Manager
+- [x] Module 15: Helm — Package Manager
 - [ ] Module 16: Helm Demo — Stateful App on K8s
 - [ ] Module 17: Deploy App from Private Docker Registry
 - [ ] Module 18: Extending K8s API with Operators
@@ -1208,13 +1210,338 @@ Module 12 closes the gap from Module 7: **the same** ConfigMap and Secret primit
 ---
 
 ## Module 16: Helm Demo — Stateful App on K8s
-> *Deploy replicated MongoDB + MongoExpress + NGINX Ingress on a cloud cluster.*
+> *Deploy replicated MongoDB + MongoExpress + NGINX Ingress on a DigitalOcean managed Kubernetes cluster (DOKS).*
 
-```bash
-# Commands will be added as each step is completed
+### Summary
+Module 16 leaves Minikube behind and moves the demo onto a real managed Kubernetes cluster (DigitalOcean DOKS — `k8s-helm-demo`) driven entirely by GitHub Actions. The first milestone — covered in this update — is wiring the CI/CD pipeline end-to-end and proving the runner can authenticate against the cluster before any Helm work runs. A dedicated feature branch (`helm-demo-managed-k8s`) holds the workflow, the kubeconfig is stored as the `KUBE_CONFIG` repo secret (never on disk, never committed), and a "Verify cluster connection" step fails fast if the secret is wrong or the cluster is unreachable. With the connection proven, the pipeline now also installs Helm, registers the Bitnami repo, and verifies the MongoDB chart is resolvable — all before the real deploy lands.
+
+**Status:** IN PROGRESS  
+**Platform:** DigitalOcean Managed Kubernetes (DOKS)  
+**Approach:** All operations run via GitHub Actions CI/CD pipeline
+
+### CI/CD Pipeline Setup
+- **Trigger:** push to `helm-demo-managed-k8s` branch (and `workflow_dispatch`)
+- **Runner:** `ubuntu-latest`
+
+### Pipeline Steps Completed
+| Step | Description | Status |
+|------|-------------|--------|
+| Checkout code | Pull repo to runner | ✅ |
+| Install kubectl | Set up kubectl on runner | ✅ |
+| Configure kubeconfig | Write KUBE_CONFIG secret to `~/.kube/config` | ✅ |
+| Verify cluster connection | `kubectl cluster-info` + `kubectl get nodes` | ✅ |
+| Set up Helm | Install Helm on runner | ✅ |
+| Verify Helm version | Confirm Helm installed correctly | ✅ |
+| Add Bitnami repo | `helm repo add bitnami` | ✅ |
+| Update Helm repos | `helm repo update` | ✅ |
+| Verify MongoDB chart | `helm search repo bitnami/mongodb` | ✅ |
+| Deploy MongoDB via Helm | `helm upgrade --install mongodb --values K8S-Config-Files/helm/helm-mongodb.yaml bitnami/mongodb` | ✅ |
+| Wait for MongoDB rollout | `kubectl rollout status statefulset/mongodb --timeout=300s` | ✅ |
+| Verify MongoDB pods | `kubectl get pod` | ✅ |
+| Verify all resources | `kubectl get all` | ✅ |
+| Verify MongoDB secrets | `kubectl get secret` | ✅ |
+| Deploy Mongo Express | `kubectl apply -f K8S-Config-Files/helm/helm-mongo-express.yaml` | ✅ |
+| Wait for Mongo Express rollout | `kubectl rollout status deployment/mongo-express --timeout=120s` | ✅ |
+| Verify Mongo Express pod | `kubectl get pod` | ✅ |
+| Check Mongo Express logs | `kubectl logs deployment/mongo-express` | ✅ |
+| Add Ingress NGINX Helm repo | `helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx` | ✅ |
+| Update Helm repos | `helm repo update` | ✅ |
+| Install NGINX Ingress Controller | `helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.publishService.enabled=true` | ✅ |
+| Wait for Ingress Controller rollout | `kubectl rollout status deployment/nginx-ingress-ingress-nginx-controller --timeout=180s` | ✅ |
+| Wait for LoadBalancer IP | `kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].ip}' svc/nginx-ingress-ingress-nginx-controller --timeout=300s` | ✅ |
+| Verify pods | `kubectl get pod` | ✅ |
+| Get services and LoadBalancer IP | `kubectl get svc` | ✅ |
+| Apply Mongo Express Ingress rule | `kubectl apply -f K8S-Config-Files/helm/helm-ingress.yaml` | ✅ |
+| Verify Ingress | `kubectl get ingress` | ✅ |
+| Scale MongoDB down to zero | `kubectl scale --replicas=0 statefulset/mongodb` | ✅ |
+| Verify pods after scale down | `kubectl get pod` | ✅ |
+| Scale MongoDB back to 3 replicas | `kubectl scale --replicas=3 statefulset/mongodb` | ✅ |
+| Wait for MongoDB rollout after scale up | `kubectl rollout status statefulset/mongodb --timeout=300s` | ✅ |
+| Verify pods after scale up | `kubectl get pod` | ✅ |
+| List Helm releases | `helm ls` | ✅ |
+| Uninstall MongoDB Helm release | `helm uninstall mongodb` | ✅ |
+
+### Next Steps
+- Confirm external browser access to Mongo Express
+- Capture screenshots of successful access
+- Mark Module 16 complete
+
+### Branch & Cluster Setup
+- **Feature branch:** `helm-demo-managed-k8s` — per [`.github/BRANCH-STRATEGY.md`](./.github/BRANCH-STRATEGY.md), feature work lands here first, then promotes `feature → k8s → main`. `main` is never targeted directly by the CI pipeline.
+- **Cluster:** `k8s-helm-demo` — 2-node pool on DigitalOcean, v1.36.0.
+- **kubeconfig:** downloaded from the DigitalOcean console, pasted into the GitHub repo secret named **`KUBE_CONFIG`**. Full setup steps in [`.github/README-secrets.md`](./.github/README-secrets.md).
+
+### CI/CD Workflow — [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml)
+Two jobs, `build` → `deploy`. The `deploy` job authenticates against DOKS via the kubeconfig secret, then (eventually) runs Helm. All tooling is fetched directly from upstream — `kubernetes.io`, `helm.sh` — no third-party or cloud-vendor-specific actions.
+
+**Trigger:**
+```yaml
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - helm-demo-managed-k8s
 ```
 
-<!-- Steps: K8s cluster on Linode, MongoDB StatefulSet via Helm, MongoExpress, NGINX Ingress -->
+> **Gotcha — `workflow_dispatch` and non-default branches:** the "Run workflow" button in the Actions UI only surfaces for workflows that exist on the **default branch**. Since this workflow lives on `helm-demo-managed-k8s` and won't reach `main` until the module is complete, the `push:` trigger was enabled so every push to the feature branch auto-runs the pipeline.
+
+**Authenticate against DOKS:**
+```yaml
+- name: Configure kubeconfig from GitHub Secret
+  run: |
+    mkdir -p $HOME/.kube
+    echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+    chmod 600 $HOME/.kube/config
+```
+
+`chmod 600` is kept because the secret is decrypted to plain disk on the runner — `kubectl` warns on world/group-readable kubeconfigs, and the perms are a defense-in-depth bet against any future self-hosted runner.
+
+### Verify Cluster Connection (Step 3b)
+A new step sits between the kubeconfig write and the Helm install so a bad / expired secret fails fast with a clear error before any deploy work runs:
+
+```yaml
+- name: Verify cluster connection
+  run: |
+    kubectl cluster-info
+    kubectl get nodes
+```
+
+**Output from the first successful run (`f57aae9` / run id `26474393325`):**
+```
+Kubernetes control plane is running at https://3d495365-...k8s.ondigitalocean.com
+CoreDNS is running at https://3d495365-...k8s.ondigitalocean.com/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+NAME                        STATUS   ROLES    AGE   VERSION
+pool-k8s-helm-demo-38e5s0   Ready    <none>   89m   v1.36.0
+pool-k8s-helm-demo-38e5sd   Ready    <none>   89m   v1.36.0
+```
+
+![Successful Verify cluster connection step in GitHub Actions](./Screenshots/Module-16/CiCD-K8s_connection.png)
+
+This confirms three things at once: the `KUBE_CONFIG` secret was written to the runner correctly, `kubectl` can authenticate against the DOKS API, and the cluster is reachable from GitHub-hosted runners.
+
+### Step 3: Helm Setup and Bitnami Repository via CI/CD Pipeline
+With the cluster connection proven, the pipeline now installs Helm directly on the runner and primes the Bitnami chart repository — the source of the MongoDB chart used in the next step. **All Helm operations run inside the GitHub Actions runner** — Helm is never installed on a developer machine, and no Helm state lives outside the workflow run (every run is ephemeral, so `helm repo add` + `helm repo update` are re-run each time).
+
+**Final deploy job step order:**
+1. **Checkout code** — pulls the repo so the workflow can reference local manifests or values files.
+2. **Install kubectl** — fetches the latest stable `kubectl` from the official Kubernetes release server.
+3. **Configure kubeconfig from GitHub Secret** — writes `${{ secrets.KUBE_CONFIG }}` to `$HOME/.kube/config` with `chmod 600`.
+4. **Verify cluster connection** — `kubectl cluster-info` + `kubectl get nodes` to fail fast on a bad/expired kubeconfig before any Helm work runs.
+5. **Set up Helm** — installs Helm 3 via the official `get-helm-3` script from `helm.sh`.
+6. **Verify Helm version** — runs `helm version` to confirm the install succeeded.
+7. **Add Bitnami Helm repository** — `helm repo add bitnami https://charts.bitnami.com/bitnami` registers the chart source on the runner.
+8. **Update Helm repositories** — `helm repo update` pulls the latest chart index from Bitnami.
+9. **Verify MongoDB chart available** — `helm search repo bitnami/mongodb` confirms the chart is resolvable before any deploy.
+10. **Deploy placeholder** — `echo "MongoDB Helm deploy - coming next step"` — replaced with the real `helm upgrade --install` in the next step.
+
+> **Note:** All Helm operations run inside the GitHub Actions runner. Each pipeline run is ephemeral — there is no persistent Helm state between runs, so the repo-add / repo-update / chart-search steps re-execute on every push.
+
+**Pipeline success — Helm install + Bitnami repo + chart-search steps all green:**
+
+![Helm Install Pipeline Success](./Screenshots/Module-16/Helm-iinstall-cicd-staus-sucess.png)
+
+### Step 4: Helm Deployment of MongoDB with Replicas and Secrets
+With Helm primed and the Bitnami MongoDB chart resolvable, the pipeline now performs the actual install — driven by a custom values file ([`K8S-Config-Files/helm/helm-mongodb.yaml`](./K8S-Config-Files/helm/helm-mongodb.yaml)). The values file is small on purpose: replica count + persistence + auth are the three knobs needed for a sane "production-shaped" MongoDB demo on DOKS. **All `helm install` / `kubectl get …` calls run inside the GitHub Actions runner — nothing is executed from a developer laptop.**
+
+| Configuration | Value |
+|---------------|-------|
+| Architecture | `replicaset` |
+| Replica Count | `3` |
+| Storage Class | `do-block-storage` |
+| Auth | `rootPassword` via Helm values |
+
+**Pipeline steps 10–13 (added on top of the Step 3 sequence):**
+10. **Deploy MongoDB via Helm** — `helm upgrade --install mongodb --values K8S-Config-Files/helm/helm-mongodb.yaml bitnami/mongodb` installs the chart on DOKS with the replica-set + persistence + auth overrides. `upgrade --install` is idempotent (installs if absent, upgrades if present) so re-running the pipeline doesn't error with "name already in use".
+11. **Verify MongoDB pods** — `kubectl get pod` confirms the 3 replica-set pods (`mongodb-0`, `mongodb-1`, `mongodb-2`) reach `Running` status.
+12. **Verify all resources** — `kubectl get all` shows the StatefulSet, headless Service, and any related Pod/PVC objects Helm rendered.
+13. **Verify MongoDB secrets** — `kubectl get secret` confirms the chart created the `mongodb` Secret holding the root password (sourced from `K8S-Config-Files/helm/helm-mongodb.yaml`).
+
+**Pipeline success — `helm install` + the three `kubectl get …` verify steps all green against DOKS:**
+
+![Deploy MongoDB replica set on DOKS via Helm in CI/CD](./Screenshots/Module-16/deploy%20MongoDB%20replica%20set%20on%20DOKS%20via%20Helm%20in%20CICD.png)
+
+**Reference:** [Bitnami MongoDB Helm Chart](https://github.com/bitnami/charts/tree/main/bitnami/mongodb)
+
+> ⚠️ **Security note:** `rootPassword` in `K8S-Config-Files/helm/helm-mongodb.yaml` is for **demo purposes only**. In production, use GitHub Secrets (or a secrets manager like Vault / AWS Secrets Manager) and reference them via `--set` or sealed values. **Never commit real passwords to the repo.**
+
+### Step 5: Web UI Setup for MongoDB Using Mongo Express and Secrets
+With the MongoDB replica set live on DOKS, the pipeline now layers [Mongo Express](https://github.com/mongo-express/mongo-express) — a web-based MongoDB admin UI — on top, defined by [`K8S-Config-Files/helm/helm-mongo-express.yaml`](./K8S-Config-Files/helm/helm-mongo-express.yaml). Mongo Express authenticates against MongoDB as `root`, reading the password at runtime from the same `mongodb` Secret that the Bitnami chart created in Step 4 — so the credential never appears in the manifest, the image, or any committed file.
+
+| Item | Value |
+|------|-------|
+| Service Type | `ClusterIP` (internal only) |
+| Container Port | `8081` |
+| Auth Method | Kubernetes Secret (`mongodb-root-password`) |
+| MongoDB Server | `mongodb-0.mongodb-headless` |
+
+**Pipeline steps 14–17 (added on top of the Step 4 sequence):**
+14. **Deploy Mongo Express** — `kubectl apply -f K8S-Config-Files/helm/helm-mongo-express.yaml` creates the Deployment + ClusterIP Service in the `default` namespace.
+15. **Wait for Mongo Express rollout** — `kubectl rollout status deployment/mongo-express --timeout=120s` blocks until the pod reaches Ready, so the next steps see a real running container.
+16. **Verify Mongo Express pod** — `kubectl get pod` confirms `mongo-express-<hash>` is `1/1 Running` alongside the MongoDB replica-set pods.
+17. **Check Mongo Express logs** — `kubectl logs deployment/mongo-express` surfaces the "Mongo Express server listening at http://0.0.0.0:8081" + DB-connect lines so a failed auth or DNS lookup shows up loud in CI.
+
+**Pipeline success — Mongo Express applied, rolled out, and verified against the running MongoDB replica set (after the `helm upgrade --install` idempotency fix):**
+
+![Mongo Express deploy + rollout + verify steps green after Helm upgrade --install fix](./Screenshots/Module-16/make%20Helm%20MongoDB%20deploy%20idempotent%20in%20CICD.png)
+
+> **Note on the log output visible above:** the `mongo:27017` DNS-resolution failure is the official `mongo-express` image's entrypoint doing a TCP wait against a **hardcoded** `mongo` hostname (it doesn't honor `ME_CONFIG_MONGODB_SERVER` for the wait — only for the actual app config). The entrypoint moves on after the wait fails, and the app then connects via the env vars we set. Because the manifest currently has no readinessProbe, `kubectl rollout status` reports success the moment the container starts, not when the UI is actually serving — a Module 22 BP3 gap to close in a later iteration.
+
+**Local access via port-forward (development/verification only):**
+```bash
+kubectl port-forward service/mongo-express-service 8081:8081
+# Then open: http://localhost:8081
+```
+
+> ⚠️ **Security note:** Service is `ClusterIP` — only accessible inside the cluster. Port-forward is for development/verification only. External access will be configured via Ingress in the next step.
+
+### Step 6: Exposing Mongo Express via Ingress NGINX on DigitalOcean
+With the ClusterIP-only Mongo Express UI running, the last step is to make it reachable from the public internet. The pipeline installs the [NGINX Ingress Controller](https://github.com/kubernetes/ingress-nginx) via its official Helm chart, then applies an Ingress rule ([`K8S-Config-Files/helm/helm-ingress.yaml`](./K8S-Config-Files/helm/helm-ingress.yaml)) that routes `/` to `mongo-express-service:8081`. DigitalOcean automatically provisions a **LoadBalancer with a public IP** for the controller's Service — that IP becomes the public entrypoint to the cluster.
+
+| Item | Value |
+|------|-------|
+| Ingress Controller | NGINX via Helm |
+| Helm Chart | `ingress-nginx/ingress-nginx` |
+| Service Type | `LoadBalancer` (DigitalOcean assigns public IP) |
+| Ingress Path | `/` (Prefix) |
+| Backend Service | `mongo-express-service:8081` |
+| Access URL | `http://<LOADBALANCER-IP>` |
+
+**Pipeline steps 18–25 (added on top of the Step 5 sequence):**
+18. **Add Ingress NGINX Helm repo** — `helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx` registers the official upstream chart source.
+19. **Update Helm repos** — `helm repo update` refreshes the chart index so the next step pulls the latest controller release.
+20. **Install NGINX Ingress Controller** — `helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.publishService.enabled=true` installs (or upgrades) the controller. `upgrade --install` keeps the step idempotent across pushes — same idempotency pattern used for the MongoDB release in Step 10. `publishService.enabled=true` makes the controller publish the LoadBalancer's external address back into Ingress `status.loadBalancer` so downstream tooling can read the public IP.
+21. **Wait for Ingress Controller rollout** — `kubectl rollout status deployment/nginx-ingress-ingress-nginx-controller --timeout=180s` blocks until the controller *pods* are Ready. Pods Ready ≠ cloud LoadBalancer provisioned, which is why the next step exists.
+21b. **Wait for LoadBalancer IP** — `kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].ip}' svc/nginx-ingress-ingress-nginx-controller --timeout=300s` blocks until DigitalOcean finishes provisioning the cloud LoadBalancer and populates `status.loadBalancer.ingress[0].ip`. Without this, the verify steps below race the LB provisioner and see `<pending>` (DO typically takes 1–3 minutes).
+22. **Verify pods** — `kubectl get pod` confirms the controller pod is `Running` alongside the MongoDB + Mongo Express pods.
+23. **Get services and LoadBalancer IP** — `kubectl get svc` surfaces the `nginx-ingress-ingress-nginx-controller` Service with its `EXTERNAL-IP` populated by DigitalOcean — that's the public address.
+24. **Apply Mongo Express Ingress rule** — `kubectl apply -f K8S-Config-Files/helm/helm-ingress.yaml` registers the `/` → `mongo-express-service:8081` route with the controller.
+25. **Verify Ingress** — `kubectl get ingress` confirms the rule is registered and surfaces the bound `ADDRESS` (the same LoadBalancer IP) for the Ingress object.
+26. **Print Mongo Express access URL** — reads `status.loadBalancer.ingress[0].ip` back off the controller Service and echoes `Mongo Express is reachable at: http://<LB-IP>` so the public URL is visible directly in the CI log — no local `kubectl` required to find it.
+
+> ⚠️ **Deprecation note:** `kubernetes.io/ingress.class` annotation is deprecated. Modern clusters prefer `spec.ingressClassName: nginx`. Safe for demo, but update before production use.
+
+**Accessing Mongo Express externally:**
+The pipeline's final step (`Print Mongo Express access URL`) echoes the public URL into the CI log — just open the linked workflow run and grab it from the log line:
+```
+Mongo Express is reachable at: http://<LB-IP>
+```
+Or query it locally if you have the DOKS kubeconfig:
+```bash
+kubectl get svc nginx-ingress-ingress-nginx-controller
+# Look at the EXTERNAL-IP column — open http://<that-ip> in a browser.
+```
+
+**End-to-end proof — Mongo Express UI loaded in a browser via the public LoadBalancer IP:**
+
+![Mongo Express UI reachable at http://134.209.140.28 — connected to mongodb-0, MongoDB 8.3.2, 23 active connections](./Screenshots/Module-16/wait%20for%20LoadBalancer%20IP%20and%20surface%20it%20in%20the%20CI%20log.png)
+
+This is the full chain working: browser → DigitalOcean cloud LoadBalancer (`134.209.140.28`) → NGINX Ingress Controller pod → Ingress rule (`/` Prefix) → `mongo-express-service` ClusterIP → Mongo Express pod → MongoDB primary (`mongodb-0.mongodb-headless.default.svc.cluster.local:27017`) authenticated via the `mongodb-root-password` Secret. Server Status block (Hostname `mongodb-0`, 23 current connections) is live data pulled from the replica set in real time.
+
+### Step 7: StatefulSet Scaling and Helm Release Verification
+With the full stack proven reachable, the pipeline now exercises the StatefulSet's resilience: scale the MongoDB cluster all the way down to zero pods, confirm clean termination, scale it back up to three, wait for the replica set to reform, and finally list every Helm release that's making up the stack. This is the kind of operation an on-call engineer might run during a real incident — the pipeline scripts it so the behavior is deterministic and reproducible, not an ad-hoc fire-drill.
+
+| Command | Purpose |
+|---------|---------|
+| `kubectl scale --replicas=0 statefulset/mongodb` | Simulate shutdown — test resilience and persistence |
+| `kubectl get pod` | Verify pods terminated cleanly |
+| `kubectl scale --replicas=3 statefulset/mongodb` | Restore MongoDB cluster to full operation |
+| `kubectl rollout status statefulset/mongodb` | Wait for all 3 replicas to be Ready |
+| `kubectl get pod` | Confirm all pods running after restore |
+| `helm ls` | List all installed Helm releases |
+| `helm uninstall mongodb` | Remove MongoDB and all associated K8s resources |
+
+> **`helm uninstall` removes:**
+> - MongoDB StatefulSet
+> - MongoDB pods
+> - MongoDB services
+> - MongoDB secrets
+> - MongoDB PersistentVolumeClaims
+>
+> Persistent volumes on DigitalOcean block storage may need manual deletion from the DO dashboard.
+
+> **Why this works at all:** scaling a StatefulSet to zero and back confirms:
+> - Persistent volumes retained data during shutdown
+> - Replica set reforms correctly on scale up
+> - DigitalOcean block storage survived the pod lifecycle
+
+**Pipeline step summary (steps 26–32, appended after the Step 6 Ingress flow):**
+
+| Step | Name | Status |
+|------|------|--------|
+| 26 | Scale MongoDB down to zero | ✅ |
+| 27 | Verify pods after scale down | ✅ |
+| 28 | Scale MongoDB back to 3 replicas | ✅ |
+| 29 | Wait for MongoDB rollout after scale up | ✅ |
+| 30 | Verify pods after scale up | ✅ |
+| 31 | List Helm releases | ✅ |
+| 32 | Uninstall MongoDB Helm release | ✅ |
+
+**Persistence proof — data survived the StatefulSet scale-to-zero-and-back cycle:**
+
+To make the persistence claim falsifiable, a `user-chad-example` database was **created via the Mongo Express UI *before* Step 7 ran** — i.e. *before* the pipeline scaled MongoDB down to 0 replicas. The screenshot below was taken *after* the pipeline finished scaling back up to 3 replicas:
+
+![Mongo Express showing user-chad-example database still present after StatefulSet scale-to-zero-and-back — block storage retained data through pod restart](./Screenshots/Module-16/mongodb-persistence-proof.png)
+
+`user-chad-example` is still in the database list. The PersistentVolumeClaims weren't deleted on scale-down — DigitalOcean Block Storage volumes stayed bound to their PVCs, and when the new pods came up they re-attached to the same volumes and replayed the data. This is the load-bearing reason a *StatefulSet* (not a Deployment) is the right primitive for MongoDB on Kubernetes.
+
+### Conclusion
+The Module 16 pipeline now stands up a complete MongoDB + Mongo Express stack on DOKS in a single push, *proves it survives a full operator-driven shutdown*, and tears MongoDB back down at the end as a teardown demo: cluster auth → Helm primed → MongoDB replica set (3 pods, DO block-storage volumes, root password from values) → Mongo Express UI wired up via secretKeyRef to the chart-generated Secret → NGINX Ingress Controller installed via its own Helm chart with a DigitalOcean LoadBalancer in front → public Ingress rule routing `/` to the UI → StatefulSet scaled to zero and back, replica set reformed cleanly off the persistent block-storage volumes, Helm releases enumerated, MongoDB release uninstalled. The "deploy → verify rollout → check logs → expose via Ingress → resilience demo → teardown" structure means any DNS, auth, image-pull, LoadBalancer provisioning, persistence/restart, **or uninstall** issue surfaces in CI rather than as a silent broken stack. With every phase green, Module 16 is complete — leading into Module 17's private-registry work.
+
+## Module 16 Summary
+
+### What We Learned
+- Deploying an Ingress Controller via Helm on a cloud K8s provider
+- Exposing internal ClusterIP services externally via Ingress rules
+- Managing StatefulSet lifecycle through scaling operations
+- Helm release management including install, verify, and uninstall
+- DigitalOcean LoadBalancer integration with NGINX Ingress
+- Securing MongoDB credentials using Kubernetes Secrets
+
+### Full Pipeline Step Summary
+| Step | Name |
+|------|------|
+| 1 | Checkout code |
+| 2 | Install kubectl |
+| 3 | Configure kubeconfig from GitHub Secret |
+| 4 | Verify cluster connection |
+| 5 | Set up Helm |
+| 6 | Verify Helm version |
+| 7 | Add Bitnami Helm repository |
+| 8 | Update Helm repositories |
+| 9 | Verify MongoDB chart available |
+| 10 | Deploy MongoDB via Helm |
+| 10b | Wait for MongoDB rollout |
+| 11 | Verify MongoDB pods |
+| 12 | Verify all resources |
+| 13 | Verify MongoDB secrets |
+| 14 | Deploy Mongo Express |
+| 15 | Wait for Mongo Express rollout |
+| 16 | Verify Mongo Express pod |
+| 17 | Check Mongo Express logs |
+| 18 | Add Ingress NGINX Helm repo |
+| 19 | Update Helm repos |
+| 20 | Install NGINX Ingress Controller |
+| 21 | Wait for Ingress Controller rollout |
+| 22 | Verify pods |
+| 23 | Get services and LoadBalancer IP |
+| 24 | Apply Mongo Express Ingress rule |
+| 25 | Verify Ingress |
+| 26 | Scale MongoDB down to zero |
+| 27 | Verify pods after scale down |
+| 28 | Scale MongoDB back to 3 replicas |
+| 29 | Wait for MongoDB rollout after scale up |
+| 30 | Verify pods after scale up |
+| 31 | List Helm releases |
+| 32 | Uninstall MongoDB Helm release |
+
+### Files Created This Module
+- `K8S-Config-Files/helm/helm-mongodb.yaml`
+- `K8S-Config-Files/helm/helm-mongo-express.yaml`
+- `K8S-Config-Files/helm/helm-ingress.yaml`
+- `.github/workflows/deploy.yml`
+- `.github/README-secrets.md`
+- `.github/BRANCH-STRATEGY.md`
 
 ---
 

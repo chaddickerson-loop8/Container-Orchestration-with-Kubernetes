@@ -1,0 +1,50 @@
+# NGINX Ingress rule for Mongo Express — Module 16 Step 6.
+# Applied by `kubectl apply -f helm-ingress.yaml` in the GitHub Actions runner,
+# AFTER the NGINX Ingress Controller (installed via Helm in Step 20) is up.
+# Routes any HTTP traffic hitting the DigitalOcean LoadBalancer (assigned to the
+# Ingress Controller's Service) into mongo-express-service:8081 inside the cluster.
+
+apiVersion: networking.k8s.io/v1
+# ✅ What it does: pins this manifest to the networking.k8s.io/v1 API group (GA Ingress).
+# 🧠 Why it matters: extensions/v1beta1 was the old Ingress API and was removed in 1.22; using GA is required on modern clusters.
+# 🌍 DevOps/Cloud: networking.k8s.io/v1 is universal across EKS/GKE/AKS/DOKS; field shapes differ from the deprecated v1beta1.
+
+kind: Ingress
+# ✅ What it does: declares this object as an Ingress (HTTP routing rule for traffic entering the cluster).
+# 🧠 Why it matters: an Ingress is just a *rule* — it needs an Ingress Controller (NGINX here) running in the cluster to act on it.
+# 🌍 DevOps/Cloud: a healthy-looking Ingress with no matching Controller silently routes nothing — common cloud-migration footgun.
+
+metadata:
+  name: mongo-express
+  # ✅ What it does: names the Ingress object `mongo-express` in the `default` namespace.
+  # 🧠 Why it matters: this name appears in `kubectl get ingress` and is what you target for delete / describe / patch.
+  # 🌍 DevOps/Cloud: names are namespace-scoped — same name can coexist in different namespaces.
+
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    # ✅ What it does: tells the NGINX Ingress Controller to pick up this rule (vs ignoring rules meant for other controllers).
+    # 🧠 Why it matters: a cluster can run multiple Ingress controllers (NGINX, Traefik, cloud LBs) — this annotation disambiguates ownership.
+    # 🌍 DevOps/Cloud: ⚠️ `kubernetes.io/ingress.class` annotation is DEPRECATED. Preferred modern approach is `spec.ingressClassName: nginx`.
+
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        # ✅ What it does: routes any request whose URL path starts with `/` (i.e., everything) to the backend below.
+        # 🧠 Why it matters: `Prefix` matches by path-segment prefix; alternatives are `Exact` and `ImplementationSpecific`.
+        # 🌍 DevOps/Cloud: a `/` Prefix rule is the simplest "catch-all" — production usually narrows to `/app`-style paths with multiple rules.
+
+        backend:
+          service:
+            name: mongo-express-service
+            # ✅ What it does: routes matched traffic to the Service named `mongo-express-service` in the same namespace.
+            # 🧠 Why it matters: must exactly match the Service created in Step 5 — typo here = 503/404 at the LoadBalancer.
+            # 🌍 DevOps/Cloud: Ingress targets Services, not Pods directly — the Service still does Pod-level load balancing under the hood.
+
+            port:
+              number: 8081
+              # ✅ What it does: forwards traffic to TCP port 8081 on the backend Service (the Mongo Express UI port).
+              # 🧠 Why it matters: must match the `port:` field on mongo-express-service (Step 5) — not the container's targetPort.
+              # 🌍 DevOps/Cloud: alternatively use `port.name: <name>` for symbolic refs — name-based is more resilient to port-number changes.

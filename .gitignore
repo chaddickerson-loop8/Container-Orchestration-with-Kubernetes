@@ -1,0 +1,26 @@
+# Secrets / credentials — never commit
+*.env
+.env.*
+.envrc
+*.pem
+*.key
+*.crt
+credentials.json
+service-account*.json
+
+# Kubeconfigs and tokens
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+.kube/
+
+# Helm
+charts/
+*.tgz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
