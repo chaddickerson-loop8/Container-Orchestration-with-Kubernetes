@@ -1265,6 +1265,8 @@ pool-k8s-helm-demo-38e5s0   Ready    <none>   89m   v1.36.0
 pool-k8s-helm-demo-38e5sd   Ready    <none>   89m   v1.36.0
 ```
 
+![Successful Verify cluster connection step in GitHub Actions](./Screenshots/Module-16/CiCD-K8s_connection.png)
+
 This confirms three things at once: the `KUBE_CONFIG` secret was written to the runner correctly, `kubectl` can authenticate against the DOKS API, and the cluster is reachable from GitHub-hosted runners.
 
 ### Helm Steps — Deferred
