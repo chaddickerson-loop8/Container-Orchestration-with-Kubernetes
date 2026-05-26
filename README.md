@@ -1235,7 +1235,7 @@ Module 16 leaves Minikube behind and moves the demo onto a real managed Kubernet
 | Add Bitnami repo | `helm repo add bitnami` | ✅ |
 | Update Helm repos | `helm repo update` | ✅ |
 | Verify MongoDB chart | `helm search repo bitnami/mongodb` | ✅ |
-| Deploy MongoDB via Helm | `helm install mongodb --values helm-mongodb.yaml bitnami/mongodb` | ✅ |
+| Deploy MongoDB via Helm | `helm upgrade --install mongodb --values helm-mongodb.yaml bitnami/mongodb` | ✅ |
 | Verify MongoDB pods | `kubectl get pod` | ✅ |
 | Verify all resources | `kubectl get all` | ✅ |
 | Verify MongoDB secrets | `kubectl get secret` | ✅ |
@@ -1335,7 +1335,7 @@ With Helm primed and the Bitnami MongoDB chart resolvable, the pipeline now perf
 | Auth | `rootPassword` via Helm values |
 
 **Pipeline steps 10–13 (added on top of the Step 3 sequence):**
-10. **Deploy MongoDB via Helm** — `helm install mongodb --values helm-mongodb.yaml bitnami/mongodb` installs the chart on DOKS with the replica-set + persistence + auth overrides.
+10. **Deploy MongoDB via Helm** — `helm upgrade --install mongodb --values helm-mongodb.yaml bitnami/mongodb` installs the chart on DOKS with the replica-set + persistence + auth overrides. `upgrade --install` is idempotent (installs if absent, upgrades if present) so re-running the pipeline doesn't error with "name already in use".
 11. **Verify MongoDB pods** — `kubectl get pod` confirms the 3 replica-set pods (`mongodb-0`, `mongodb-1`, `mongodb-2`) reach `Running` status.
 12. **Verify all resources** — `kubectl get all` shows the StatefulSet, headless Service, and any related Pod/PVC objects Helm rendered.
 13. **Verify MongoDB secrets** — `kubectl get secret` confirms the chart created the `mongodb` Secret holding the root password (sourced from `helm-mongodb.yaml`).

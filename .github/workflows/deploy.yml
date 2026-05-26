@@ -82,10 +82,13 @@ jobs:
       - name: Verify MongoDB chart available
         run: helm search repo bitnami/mongodb
 
-      # Step 10 — deploy MongoDB using Helm with custom values file
+      # Step 10 — deploy (or upgrade) MongoDB using Helm with custom values file.
+      # `upgrade --install` is idempotent — installs the release if absent, upgrades
+      # it if it already exists. Plain `helm install` fails on every push after the
+      # first with "cannot re-use a name that is still in use".
       - name: Deploy MongoDB via Helm
         run: |
-          helm install mongodb \
+          helm upgrade --install mongodb \
             --values helm-mongodb.yaml \
             bitnami/mongodb
 
