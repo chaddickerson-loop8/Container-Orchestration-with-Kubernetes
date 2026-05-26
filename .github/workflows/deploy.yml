@@ -82,6 +82,21 @@ jobs:
       - name: Verify MongoDB chart available
         run: helm search repo bitnami/mongodb
 
-      # Step 8 — MongoDB Helm deploy coming next step
-      - name: Deploy
-        run: echo "MongoDB Helm deploy - coming next step"
+      # Step 10 — deploy MongoDB using Helm with custom values file
+      - name: Deploy MongoDB via Helm
+        run: |
+          helm install mongodb \
+            --values helm-mongodb.yaml \
+            bitnami/mongodb
+
+      # Step 11 — verify MongoDB pods are running
+      - name: Verify MongoDB pods
+        run: kubectl get pod
+
+      # Step 12 — verify all Kubernetes resources created by Helm
+      - name: Verify all resources
+        run: kubectl get all
+
+      # Step 13 — verify MongoDB secrets were created
+      - name: Verify MongoDB secrets
+        run: kubectl get secret

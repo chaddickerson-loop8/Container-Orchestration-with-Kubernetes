@@ -1,0 +1,25 @@
+# Bitnami MongoDB Helm chart values — Module 16 demo on DOKS.
+# Consumed by `helm install mongodb --values helm-mongodb.yaml bitnami/mongodb`
+# in .github/workflows/deploy.yml (runs inside the GitHub Actions runner).
+
+architecture: replicaset
+# ✅ What it does: deploys MongoDB as a replica set (multiple cooperating pods) instead of a single standalone pod.
+# 🧠 Why it matters: replica sets give automatic failover and read scaling — losing one pod doesn't lose the database.
+# 🌍 DevOps/Cloud: every cloud-managed Mongo (Atlas, DocumentDB) is a replica set under the hood — this matches production.
+
+replicaCount: 3
+# ✅ What it does: sets the number of MongoDB pods in the replica set to 3.
+# 🧠 Why it matters: 3 is the smallest cluster that survives one node failure while still electing a primary (quorum = 2).
+# 🌍 DevOps/Cloud: 3-replica HA is the standard baseline across cloud providers — odd counts prevent split-brain elections.
+
+persistence:
+  storageClass: "do-block-storage"
+  # ✅ What it does: tells the chart's PersistentVolumeClaims to provision DigitalOcean Block Storage volumes for each pod.
+  # 🧠 Why it matters: pods are ephemeral — without persistent volumes the database data disappears on every restart.
+  # 🌍 DevOps/Cloud: `do-block-storage` is DOKS's default CSI driver; on EKS it'd be `gp2`/`gp3`, on GKE `standard`.
+
+auth:
+  rootPassword: secret-root-pwd
+  # ✅ What it does: sets the MongoDB root user password instead of letting Helm generate a random one.
+  # 🧠 Why it matters: a known password is required so Mongo Express (and any other client) can wire up via Secret references.
+  # 🌍 DevOps/Cloud: demo-only — in production this value comes from a secrets manager (Vault, AWS Secrets Manager, GH OIDC), never the values file.

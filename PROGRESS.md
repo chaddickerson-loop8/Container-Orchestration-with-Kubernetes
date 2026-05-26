@@ -23,7 +23,16 @@
 - [x] Bitnami repository added to pipeline
 - [x] Helm repo update added to pipeline
 - [x] MongoDB chart verification added to pipeline
-- [ ] Deploy MongoDB StatefulSet via Helm (next step)
+- [x] helm-mongodb.yaml values file created
+- [x] MongoDB deployed via Helm with replicaset architecture
+- [x] 3 replicas configured
+- [x] do-block-storage persistence configured
+- [x] MongoDB pods verified
+- [x] All Kubernetes resources verified
+- [x] MongoDB secrets verified
+- [ ] Deploy MongoExpress (next step)
+- [ ] Configure NGINX Ingress Controller
+- [ ] Configure Ingress rule
 - [ ] Verify deploy run against DOKS cluster `k8s-helm-demo`
 - [ ] Merge `helm-demo-managed-k8s` → `k8s` after module is complete
 

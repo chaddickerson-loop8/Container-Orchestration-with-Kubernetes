@@ -1235,16 +1235,15 @@ Module 16 leaves Minikube behind and moves the demo onto a real managed Kubernet
 | Add Bitnami repo | `helm repo add bitnami` | ✅ |
 | Update Helm repos | `helm repo update` | ✅ |
 | Verify MongoDB chart | `helm search repo bitnami/mongodb` | ✅ |
-| Deploy placeholder | MongoDB Helm deploy coming next | 🔄 |
-
-### Screenshots
-![Helm Install Pipeline Success](./Screenshots/Module-16/Helm-iinstall-cicd-staus-sucess.png)
+| Deploy MongoDB via Helm | `helm install mongodb --values helm-mongodb.yaml bitnami/mongodb` | ✅ |
+| Verify MongoDB pods | `kubectl get pod` | ✅ |
+| Verify all resources | `kubectl get all` | ✅ |
+| Verify MongoDB secrets | `kubectl get secret` | ✅ |
 
 ### Next Steps
-- Deploy MongoDB StatefulSet via Helm
-- Configure data persistence
 - Deploy MongoExpress
 - Configure NGINX Ingress Controller
+- Configure Ingress rule
 
 ### Branch & Cluster Setup
 - **Feature branch:** `helm-demo-managed-k8s` — per [`.github/BRANCH-STRATEGY.md`](./.github/BRANCH-STRATEGY.md), feature work lands here first, then promotes `feature → k8s → main`. `main` is never targeted directly by the CI pipeline.
@@ -1317,8 +1316,32 @@ With the cluster connection proven, the pipeline now installs Helm directly on t
 
 > **Note:** All Helm operations run inside the GitHub Actions runner. Each pipeline run is ephemeral — there is no persistent Helm state between runs, so the repo-add / repo-update / chart-search steps re-execute on every push.
 
+**Pipeline success — Helm install + Bitnami repo + chart-search steps all green:**
+
+![Helm Install Pipeline Success](./Screenshots/Module-16/Helm-iinstall-cicd-staus-sucess.png)
+
+### Step 4: Helm Deployment of MongoDB with Replicas and Secrets
+With Helm primed and the Bitnami MongoDB chart resolvable, the pipeline now performs the actual install — driven by a custom values file ([`helm-mongodb.yaml`](./helm-mongodb.yaml)) committed to the repo root. The values file is small on purpose: replica count + persistence + auth are the three knobs needed for a sane "production-shaped" MongoDB demo on DOKS. **All `helm install` / `kubectl get …` calls run inside the GitHub Actions runner — nothing is executed from a developer laptop.**
+
+| Configuration | Value |
+|---------------|-------|
+| Architecture | `replicaset` |
+| Replica Count | `3` |
+| Storage Class | `do-block-storage` |
+| Auth | `rootPassword` via Helm values |
+
+**Pipeline steps 10–13 (added on top of the Step 3 sequence):**
+10. **Deploy MongoDB via Helm** — `helm install mongodb --values helm-mongodb.yaml bitnami/mongodb` installs the chart on DOKS with the replica-set + persistence + auth overrides.
+11. **Verify MongoDB pods** — `kubectl get pod` confirms the 3 replica-set pods (`mongodb-0`, `mongodb-1`, `mongodb-2`) reach `Running` status.
+12. **Verify all resources** — `kubectl get all` shows the StatefulSet, headless Service, and any related Pod/PVC objects Helm rendered.
+13. **Verify MongoDB secrets** — `kubectl get secret` confirms the chart created the `mongodb` Secret holding the root password (sourced from `helm-mongodb.yaml`).
+
+**Reference:** [Bitnami MongoDB Helm Chart](https://github.com/bitnami/charts/tree/main/bitnami/mongodb)
+
+> ⚠️ **Security note:** `rootPassword` in `helm-mongodb.yaml` is for **demo purposes only**. In production, use GitHub Secrets (or a secrets manager like Vault / AWS Secrets Manager) and reference them via `--set` or sealed values. **Never commit real passwords to the repo.**
+
 ### Conclusion
-The Module 16 pipeline is live and Helm-aware: every push to `helm-demo-managed-k8s` now authenticates against DOKS, verifies the cluster, installs Helm fresh on the runner, registers Bitnami, and confirms the MongoDB chart is resolvable — all before any deploy runs. The "connection-check first, then chart-availability-check" structure means a bad kubeconfig *or* a missing chart fails in seconds with a readable error instead of halfway through a release. Next step: replace the deploy placeholder with `helm upgrade --install` against the Bitnami MongoDB chart (replicated StatefulSet), then layer Mongo Express + NGINX Ingress on top — leading directly into Module 17's private-registry work.
+The Module 16 pipeline now does a full end-to-end Helm deploy: every push to `helm-demo-managed-k8s` authenticates against DOKS, primes Helm + Bitnami, installs the MongoDB replica set (3 pods, DO block-storage volumes, custom root password), and verifies pods + resources + secrets — all inside the ephemeral GitHub Actions runner with no developer-laptop steps in the loop. The "connection-check → chart-check → deploy → verify" structure means any failure surfaces with a focused error message instead of halfway through a release. Next: layer Mongo Express on top of the running replica set, then expose it via NGINX Ingress — leading into Module 17's private-registry work.
 
 ---
 
