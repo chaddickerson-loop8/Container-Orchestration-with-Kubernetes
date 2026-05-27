@@ -1589,6 +1589,12 @@ aws sts get-caller-identity
 770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app
 ```
 
+**The target repository in the AWS ECR console:**
+
+![AWS ECR Console showing the my-app private repository in account 770535378489, region us-east-1, AES-256 encrypted, mutable tags](./Screenshots/Module-17/aws-ecr-private-repository-my-app.png)
+
+Single repo (`my-app`) in the private registry. The full image path used everywhere downstream is `770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app:<tag>` — that's what Step 3's Deployment will pull.
+
 > ⚠️ **Security note:** ECR tokens expire every **12 hours**. Never commit `token.txt` or `config.json` to Git. Add `token.txt` to `.gitignore` immediately.
 
 > 💡 **Docker Desktop on Windows + WSL gotcha:** after `docker login` succeeds on the host, `~/.docker/config.json` looks like:
@@ -1666,7 +1672,11 @@ my-registry-key-two   kubernetes.io/dockerconfigjson   1      13s
 
 Both Secrets resolve to the same type (`kubernetes.io/dockerconfigjson`) and same key (`.dockerconfigjson`) — proving Method 1 and Method 2 produce structurally identical Secrets, just sourced differently. Either one can be referenced by the Deployment in Step 3 via `imagePullSecrets`.
 
-Screenshots: `Screenshots/Module-17/` (folder pre-created — captures of `kubectl get secret`, the `kubectl get secret -o yaml` output, and any browser/AWS-console proof go here).
+**Live proof — both Secrets visible in the Minikube cluster:**
+
+![Terminal showing kubectl get secret with my-registry-key (Method 1, 116s) and my-registry-key-two (Method 2, 105s), both kubernetes.io/dockerconfigjson, DATA=1](./Screenshots/Module-17/kubectl-get-secret-both-methods.png)
+
+Both Secrets sit side-by-side with identical type and DATA count — the ~10s gap between AGEs matches the order we ran the two `kubectl create secret` commands.
 
 ---
 
