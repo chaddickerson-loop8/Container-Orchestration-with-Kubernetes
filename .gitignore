@@ -14,6 +14,12 @@ kubeconfig.*
 *.kubeconfig
 .kube/
 
+# Docker / ECR credentials — Module 17
+token.txt
+*.token
+config.json
+.docker/
+
 # Helm
 charts/
 *.tgz

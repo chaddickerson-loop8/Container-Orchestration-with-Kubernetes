@@ -1,23 +1,46 @@
 # Progress Tracker — Kubernetes Bootcamp
 
 ## Current Session
-**Module 16 - Helm Demo — Stateful App on K8s** ✅ COMPLETE
+**Module 17 - Deploy App from Private Docker Registry** (IN PROGRESS)
 
-**Next up:** Module 17 - Deploy App from Private Docker Registry
+- **Branch:** `K8s`
+- **Registry:** AWS ECR — `770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app`
+- **Cluster:** Minikube (local, for the Docker-side auth demo)
+- **Previous module:** Module 16 ✅ complete (merged to `K8s` via PR #2, commit `d31ca7c`)
 
-- **Branch:** `helm-demo-managed-k8s` (feature branch — see `.github/BRANCH-STRATEGY.md`)
-- **Cluster:** DigitalOcean Managed Kubernetes (DOKS) — `k8s-helm-demo`
-- **kubeconfig:** stored as GitHub Secret `KUBE_CONFIG` (not on disk, not in repo)
+### Module 17 Checklist
+- [x] Pre-existing module-7/12 pods torn down (`kubectl delete deployment/service/configmap/secret/pvc`)
+- [x] Clean environment verified — `kubectl get all` shows only `service/kubernetes`
+- [x] AWS CLI credentials verified — `aws sts get-caller-identity` → Account `770535378489`
+- [x] Docker authenticated with AWS ECR (host-side `docker login` → `Login Succeeded`)
+- [x] Host `~/.docker/config.json` observed with `credsStore: "desktop.exe"` (Docker Desktop gotcha documented)
+- [x] ECR registry: `770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app`
+- [x] ECR token saved to `token.txt` (1793 bytes, gitignored)
+- [x] `token.txt` copied to Minikube VM via `minikube cp`
+- [x] Minikube SSH verified — `token.txt` readable inside VM
+- [x] **In-VM `docker login`** executed using the copied token — produced inline `~/.docker/config.json` inside the VM
+- [x] In-VM `config.json` verified — `auths[…].auth` is a real base64 blob (not the host's empty Desktop-wrapped version)
+- [x] Navigated to home directory (`cd $HOME` / `pwd` → `/home/loop_8`)
+- [x] Docker `config.json` copied from Minikube VM to local host (`minikube cp minikube:/home/docker/.docker/config.json $HOME/.docker/config.json`)
+- [x] Host `config.json` now has the inline `auth: …` blob (overwrote the empty Desktop.exe-wrapped version)
+- [x] `config.json` base64-encoded — 3312 bytes (PowerShell `[Convert]::ToBase64String(...)` or bash `base64 -w0` — same output)
+- [x] `K8S-Config-Files/my-registry-secret.yaml` created (template only — never applied)
+- [x] **Secret created via Method 1** — `secret/my-registry-key created` (`kubectl create secret generic … --from-file=.dockerconfigjson=…`)
+- [x] **Secret created via Method 2** — `secret/my-registry-key-two created` (`kubectl create secret docker-registry … --docker-password="$TOKEN"`)
+- [x] `kubectl get secret` confirmed both Secrets, both `kubernetes.io/dockerconfigjson`, DATA=1
+- [x] `kubectl get secret -o yaml` confirmed shape (`.dockerconfigjson` key, base64 payload, `type: kubernetes.io/dockerconfigjson`)
+- [ ] Step 3: Deploy app using private Docker image (next — Deployment with `imagePullSecrets: [my-registry-key]`)
 
 ### Notes
-- CI/CD workflow structure created locally.
-- Branch: `helm-demo-managed-k8s`.
-- kubeconfig stored as GitHub Secret: `KUBE_CONFIG`.
-- All pipeline screenshots saved to `Screenshots/Module-16/` (per CLAUDE.md screenshot rule — task templates referenced `docs/screenshots/module-16/` but project convention is `Screenshots/`).
-- Screenshots placed inline under their matching pipeline steps in `README.md`:
-  - `CiCD-K8s_connection.png` → **Verify Cluster Connection (Step 3b)**
-  - `Helm-iinstall-cicd-staus-sucess.png` → **Step 3: Helm Setup and Bitnami Repository via CI/CD Pipeline**
-  - `deploy MongoDB replica set on DOKS via Helm in CICD.png` → **Step 4: Helm Deployment of MongoDB with Replicas and Secrets**
+- **Module 17 cluster:** local Minikube (not DOKS — that was Module 16).
+- AWS account in use: `770535378489` (verified via `aws sts get-caller-identity`).
+- ECR registry: `770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app`.
+- Pre-existing pods (mongo-express, mongodb-deployment, mosquitto from earlier modules) were torn down to start with a clean slate before Step 1.
+- Module 16 history (kept for reference):
+  - CI/CD workflow structure created locally on branch `helm-demo-managed-k8s`.
+  - kubeconfig stored as GitHub Secret: `KUBE_CONFIG`.
+  - All Module 16 pipeline screenshots in `Screenshots/Module-16/`.
+- **Module 17 screenshots:** `Screenshots/Module-17/` (folder pre-created — empty until first capture lands).
 
 ### Checklist
 - [x] CI/CD workflow created (`.github/workflows/deploy.yml`, triggers on `helm-demo-managed-k8s`)
@@ -87,7 +110,7 @@
 - [x] Module 16 - Helm Demo — Stateful App on K8s (DigitalOcean DOKS via GitHub Actions, 32-step pipeline)
 
 ### In Progress
-- [ ] Module 17 - Deploy App from Private Docker Registry
+- [🔄] Module 17 - Deploy App from Private Docker Registry (AWS ECR auth in progress)
 
 ### TODO
 - [ ] Module 8 - Namespaces

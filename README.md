@@ -1548,11 +1548,125 @@ The Module 16 pipeline now stands up a complete MongoDB + Mongo Express stack on
 ## Module 17: Deploy App from Private Docker Registry
 > *Pull images from AWS ECR using K8s Secrets.*
 
+### Summary
+Module 17 switches the registry from public Docker Hub to a **private AWS Elastic Container Registry (ECR)** repository (`770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app`). To pull from a private registry, Kubernetes needs credentials — a `kubernetes.io/dockerconfigjson` Secret built from a Docker auth config — and the Deployment has to reference that Secret via `imagePullSecrets`. Step 1 sets up the Docker side: authenticate locally against ECR with a 12-hour token, verify `~/.docker/config.json`, then carry the token into the Minikube VM so the in-VM Docker daemon can pull the same image.
+
+### Step 1: Authenticate Docker and Minikube with AWS ECR
+
+#### Prerequisite — clean cluster + working AWS creds
 ```bash
-# Commands will be added here
+# Clean any leftover workloads from prior modules
+kubectl delete deployment mongo-express mongodb-deployment mosquitto 2>/dev/null
+kubectl delete service mongo-express-service mongodb-service mosquitto-service 2>/dev/null
+kubectl delete configmap mongodb-configmap mosquitto-config 2>/dev/null
+kubectl delete secret mongodb-secret mosquitto-secret-file 2>/dev/null
+kubectl delete pvc --all 2>/dev/null
+kubectl get all   # should only show `service/kubernetes`
+
+# Confirm AWS CLI is authenticated against the right account
+aws sts get-caller-identity
+# Expected: Account = 770535378489 (matches the ECR registry)
 ```
 
-<!-- Steps: docker login, create docker config.json, create Secret, configure Deployment -->
+#### Step 1 commands
+
+| Command | Purpose |
+|---------|---------|
+| `kubectl get pods` | Verify clean environment — no pods running |
+| `aws ecr get-login-password --region us-east-1 \| docker login --username AWS --password-stdin 770535378489.dkr.ecr.us-east-1.amazonaws.com` | Authenticate Docker with AWS ECR using temp token |
+| `cat ~/.docker/config.json` | Verify Docker auth config saved correctly |
+| `aws ecr get-login-password` | Generate ECR token separately |
+| `aws ecr get-login-password --region us-east-1 > token.txt` | Save token to file without exposing in shell history |
+| `minikube cp token.txt /home/docker/token.txt` | Copy token into Minikube VM |
+| `minikube ssh` | Open shell inside Minikube VM |
+| `cat ./token.txt` | Read saved token inside Minikube VM |
+| `ls -a` | List all files including hidden |
+| `minikube ssh -- 'cat /home/docker/token.txt \| docker login --username AWS --password-stdin 770535378489.dkr.ecr.us-east-1.amazonaws.com'` | **Run `docker login` *inside* the VM** so an inline `~/.docker/config.json` gets written there (required before Step 2 can copy it out) |
+| `cat ~/.docker/config.json` | Verify Docker config inside Minikube VM (after in-VM login — should now show inline `auth: …`) |
+
+**Private ECR Registry:**
+```
+770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app
+```
+
+> ⚠️ **Security note:** ECR tokens expire every **12 hours**. Never commit `token.txt` or `config.json` to Git. Add `token.txt` to `.gitignore` immediately.
+
+> 💡 **Docker Desktop on Windows + WSL gotcha:** after `docker login` succeeds on the host, `~/.docker/config.json` looks like:
+> ```json
+> {
+>   "auths": { "770535378489.dkr.ecr.us-east-1.amazonaws.com": {} },
+>   "credsStore": "desktop.exe"
+> }
+> ```
+> The `auths` block is **empty** and the real token lives in the Windows credential store (`credsStore: "desktop.exe"`) — not inline in the file. A Kubernetes Secret built directly from this host file would carry no credentials and `kubectl create secret docker-registry --from-file=...` would silently produce a useless Secret. That's the load-bearing reason for the `token.txt → minikube cp → minikube ssh → docker login inside the VM` workflow above — it produces a real, inline `~/.docker/config.json` *inside the Minikube VM* that Step 2 can turn into a working Secret. On Linux hosts without Docker Desktop, the host `config.json` usually has the token inline and this dance isn't needed.
+
+### Step 2: Create Kubernetes Secret for ECR Credentials
+Once the in-VM `~/.docker/config.json` carries the inline ECR auth, the goal is to lift it back out and shape it into a Kubernetes Secret of type `kubernetes.io/dockerconfigjson`. That Secret is what the Deployment in Step 3 will reference via `imagePullSecrets` to authenticate the kubelet against ECR at pull time. A reference template is committed at [`K8S-Config-Files/my-registry-secret.yaml`](./K8S-Config-Files/my-registry-secret.yaml) — annotated for teaching, **never applied directly** (the real Secret is built from a live, inline `config.json`).
+
+| Command | Purpose |
+|---------|---------|
+| `cd $HOME` | Navigate to home directory in PowerShell |
+| `pwd` | Confirm current working directory |
+| `minikube cp minikube:/home/docker/.docker/config.json .docker\config.json` | Copy Docker config from Minikube VM to local system |
+| `cat ~/.docker/config.json` | View Docker auth credentials (sensitive — redacted) |
+| `[Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\.docker\config.json"))` | Base64 encode `config.json` for the Kubernetes Secret (PowerShell) |
+| `base64 -w0 ~/.docker/config.json` | Same encoding from bash/WSL (bash equivalent of the PowerShell one-liner above) |
+
+#### Method 1 — Create Secret from config file
+```bash
+kubectl create secret generic my-registry-key \
+  --from-file=.dockerconfigjson="$HOME\.docker\config.json" \
+  --type=kubernetes.io/dockerconfigjson
+```
+
+#### Method 2 — Create Secret using docker-registry type
+```bash
+kubectl create secret docker-registry my-registry-key-two \
+  --docker-server=https://770535378489.dkr.ecr.us-east-1.amazonaws.com \
+  --docker-username=AWS \
+  --docker-password=<paste-ecr-token-here>
+```
+
+#### Verification
+```bash
+kubectl get secret
+kubectl get secret -o yaml
+```
+
+> **Method 1 vs Method 2:**
+> - **Method 1** reads directly from `config.json` — simpler, fewer flags.
+> - **Method 2** passes credentials as explicit flags — more explicit, easier to script.
+> - Both produce a `kubernetes.io/dockerconfigjson` Secret type.
+> - **Use Method 2 in CI/CD pipelines** where the token comes from a GitHub Secret / vault — no on-disk `config.json` to manage.
+
+> ⚠️ **Security note:** `kubectl get secret -o yaml` reveals the **base64-encoded** payload. Base64 is **not encryption** — anyone with read access to the cluster can decode it back to plaintext. For production, use **AWS Secrets Manager**, **Sealed Secrets**, or **External Secrets Operator** to keep raw credentials out of etcd.
+
+#### Live run — what we actually observed
+Executed end-to-end in this WSL shell against the local Minikube cluster:
+
+```
+$ kubectl create secret generic my-registry-key \
+    --from-file=.dockerconfigjson=$HOME/.docker/config.json \
+    --type=kubernetes.io/dockerconfigjson
+secret/my-registry-key created
+
+$ TOKEN=$(aws ecr get-login-password --region us-east-1)
+$ kubectl create secret docker-registry my-registry-key-two \
+    --docker-server=https://770535378489.dkr.ecr.us-east-1.amazonaws.com \
+    --docker-username=AWS \
+    --docker-password="$TOKEN"
+secret/my-registry-key-two created
+$ unset TOKEN
+
+$ kubectl get secret
+NAME                  TYPE                             DATA   AGE
+my-registry-key       kubernetes.io/dockerconfigjson   1      24s
+my-registry-key-two   kubernetes.io/dockerconfigjson   1      13s
+```
+
+Both Secrets resolve to the same type (`kubernetes.io/dockerconfigjson`) and same key (`.dockerconfigjson`) — proving Method 1 and Method 2 produce structurally identical Secrets, just sourced differently. Either one can be referenced by the Deployment in Step 3 via `imagePullSecrets`.
+
+Screenshots: `Screenshots/Module-17/` (folder pre-created — captures of `kubectl get secret`, the `kubectl get secret -o yaml` output, and any browser/AWS-console proof go here).
 
 ---
 
