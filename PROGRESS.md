@@ -1,12 +1,11 @@
 # Progress Tracker — Kubernetes Bootcamp
 
 ## Current Session
-**Module 17 - Deploy App from Private Docker Registry** (IN PROGRESS)
+**Module 21 - Demo — Deploy Microservices App** (IN PROGRESS)
 
 - **Branch:** `K8s`
-- **Registry:** AWS ECR — `770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app`
-- **Cluster:** Minikube (local, for the Docker-side auth demo)
-- **Previous module:** Module 16 ✅ complete (merged to `K8s` via PR #2, commit `d31ca7c`)
+- **Scope:** Deploy an 11-service Online Shop microservices app to a K8s cluster (Namespace, deploy all services, browser access).
+- **Previous module:** Module 17 ✅ complete (Step 3 `imagePullSecrets` demo documented + Conclusion, commit `5ff9677`)
 
 ### Module 17 Checklist
 - [x] Pre-existing module-7/12 pods torn down (`kubectl delete deployment/service/configmap/secret/pvc`)
@@ -29,7 +28,7 @@
 - [x] **Secret created via Method 2** — `secret/my-registry-key-two created` (`kubectl create secret docker-registry … --docker-password="$TOKEN"`)
 - [x] `kubectl get secret` confirmed both Secrets, both `kubernetes.io/dockerconfigjson`, DATA=1
 - [x] `kubectl get secret -o yaml` confirmed shape (`.dockerconfigjson` key, base64 payload, `type: kubernetes.io/dockerconfigjson`)
-- [ ] Step 3: Deploy app using private Docker image (next — Deployment with `imagePullSecrets: [my-registry-key]`)
+- [x] Step 3: Deploy app using private Docker image — documented failure-vs-success pair (`my-app-deployment.yaml` no `imagePullSecrets` → `ImagePullBackOff`; `my-app-deployment-two.yaml` with `imagePullSecrets: [my-registry-key]` → `Running`) + Conclusion
 
 ### Notes
 - **Module 17 cluster:** local Minikube (not DOKS — that was Module 16).
@@ -108,9 +107,10 @@
 - [x] Module 12 - ConfigMap & Secret Volume Types
 - [x] Module 15 - Helm — Package Manager
 - [x] Module 16 - Helm Demo — Stateful App on K8s (DigitalOcean DOKS via GitHub Actions, 32-step pipeline)
+- [x] Module 17 - Deploy App from Private Docker Registry (AWS ECR auth + `imagePullSecrets` demo)
 
 ### In Progress
-- [🔄] Module 17 - Deploy App from Private Docker Registry (AWS ECR auth in progress)
+- [🔄] Module 21 - Demo — Deploy Microservices App (starting)
 
 ### TODO
 - [ ] Module 8 - Namespaces
@@ -121,12 +121,11 @@
 - [ ] Module 18 - Extending K8s API with Operators
 - [ ] Module 19 - RBAC — Authorization & Security
 - [ ] Module 20 - Microservices in Kubernetes
-- [ ] Module 21 - Demo — Deploy Microservices App
 - [ ] Module 22 - Production & Security Best Practices
 - [ ] Module 23 - Demo — Create Helm Chart for Microservices
 - [ ] Module 24 - Demo — Deploy Microservices with Helmfile
 
 ---
 
-**Last Updated:** 2026-05-26  
-**Total Progress:** 10/24 modules (41.7%)
+**Last Updated:** 2026-06-16  
+**Total Progress:** 11/24 modules (45.8%)

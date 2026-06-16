@@ -1742,11 +1742,13 @@ Pulling from a **private** registry comes down to two linked pieces: a `kubernet
 ## Module 21: Demo — Deploy Microservices App
 > *Deploy an 11-service Online Shop application to a cloud K8s cluster.*
 
-```bash
-# Commands will be added here
-```
+### Summary
+<!-- Filled in as we work: deploy the 11-service Online Shop microservices app — its YAML manifests, a Namespace, all service Deployments + Services, and external browser access. -->
 
-<!-- Steps: YAML manifests, 3-node Linode cluster, Namespace, deploy all services, access from browser -->
+<!-- Step sections (commands, YAML, output, gotchas) added here as each is run. -->
+
+### Conclusion
+<!-- Key takeaway + link to the next module — added when the module is complete. -->
 
 ---
 
