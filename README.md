@@ -66,7 +66,7 @@ Jump to the [Progress Tracker](#progress-tracker) below to see which modules are
 - [ ] Module 14: Managed Kubernetes Services
 - [x] Module 15: Helm — Package Manager
 - [ ] Module 16: Helm Demo — Stateful App on K8s
-- [ ] Module 17: Deploy App from Private Docker Registry
+- [x] Module 17: Deploy App from Private Docker Registry
 - [ ] Module 18: Extending K8s API with Operators
 - [ ] Module 19: RBAC — Authorization & Security
 - [ ] Module 20: Microservices in Kubernetes
@@ -1677,6 +1677,44 @@ Both Secrets resolve to the same type (`kubernetes.io/dockerconfigjson`) and sam
 ![Terminal showing kubectl get secret with my-registry-key (Method 1, 116s) and my-registry-key-two (Method 2, 105s), both kubernetes.io/dockerconfigjson, DATA=1](./Screenshots/Module-17/kubectl-get-secret-both-methods.png)
 
 Both Secrets sit side-by-side with identical type and DATA count — the ~10s gap between AGEs matches the order we ran the two `kubectl create secret` commands.
+
+### Step 3: Reference the Secret in a Deployment via `imagePullSecrets`
+A Secret only helps if the Deployment actually points the kubelet at it. Step 3 proves this with a deliberate **failure-vs-success pair** of manifests — same private ECR image (`770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app:1.2`), the only difference being whether `imagePullSecrets` is present.
+
+**Failure variant — `K8S-Config-Files/my-app-deployment.yaml`** (no `imagePullSecrets`): the kubelet has no ECR credentials, so the pull is rejected and the Pod stalls in `ImagePullBackOff` / `ErrImagePull`.
+
+**Working variant — `K8S-Config-Files/my-app-deployment-two.yaml`**: adds the pull Secret and forces a re-pull on every start.
+```yaml
+spec:
+  imagePullSecrets:
+  - name: my-registry-key          # Secret created in Step 2
+  containers:
+  - name: my-app-two
+    image: 770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app:1.2
+    imagePullPolicy: Always         # ECR tokens are short-lived (12h) — re-auth on restart
+```
+
+Apply both and compare:
+```bash
+kubectl apply -f K8S-Config-Files/my-app-deployment.yaml
+kubectl apply -f K8S-Config-Files/my-app-deployment-two.yaml
+
+kubectl get pods -o wide
+kubectl describe pod -l app=my-app        # pull-auth failure event
+kubectl describe pod -l app=my-app-two    # successful pull
+```
+
+**Expected result:** `my-app` sits in `ImagePullBackOff` (no creds), while `my-app-two` reaches `Running` because the kubelet uses `my-registry-key` to authenticate against ECR.
+```
+NAME                          READY   STATUS             RESTARTS   AGE
+my-app-xxxxxxxxxx-xxxxx        0/1     ImagePullBackOff   0          30s
+my-app-two-xxxxxxxxxx-xxxxx    1/1     Running            0          30s
+```
+
+> ⚠️ **Gotcha:** the registry hostname in `image:` must match the `--docker-server` used when the Secret was created, or the kubelet won't pick the right credential. And because the ECR token expires after 12h, a Pod that restarts on a stale Secret will fall back to `ImagePullBackOff` — re-run the Step 2 `create secret` command to refresh it.
+
+### Conclusion
+Pulling from a **private** registry comes down to two linked pieces: a `kubernetes.io/dockerconfigjson` Secret holding the registry credentials (Step 2), and a Deployment that references it through `imagePullSecrets` (Step 3). Miss either — no Secret, a typo in the registry host, or an expired ECR token — and the Pod can't authenticate and parks in `ImagePullBackOff`; get both right and the kubelet pulls the image transparently. The failure-vs-success manifest pair makes the dependency unmistakable. This credential-wiring pattern carries straight into the cluster-extension and security work ahead — Operators (18), RBAC (19), and Microservices (20) — on the way to the full microservices demo in Module 21.
 
 ---
 

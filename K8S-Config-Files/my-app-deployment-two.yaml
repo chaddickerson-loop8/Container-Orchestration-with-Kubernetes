@@ -1,0 +1,76 @@
+# Module 17 Step 3 — Deployment WITH `imagePullSecrets` (working variant).
+# References the `my-registry-key` Secret created in Step 2. The kubelet
+# uses that Secret to authenticate against the AWS ECR registry at image-pull
+# time. Without it, this manifest would fail exactly like `my-app-deployment.yaml`.
+
+apiVersion: apps/v1
+# ✅ What it does: pins this manifest to the apps/v1 API group (GA Deployment).
+# 🧠 Why it matters: apps/v1 is the only group on modern K8s that supports Deployments.
+# 🌍 DevOps/Cloud: identical group across EKS / GKE / AKS / DOKS / Minikube.
+
+kind: Deployment
+# ✅ What it does: declares this object as a Deployment (rolling-update-capable Pod controller).
+# 🧠 Why it matters: Deployments add ReplicaSet management and revision history Pods don't have.
+# 🌍 DevOps/Cloud: the standard stateless-workload primitive — what every CD pipeline targets.
+
+metadata:
+  name: my-app-two
+  # ✅ What it does: names the Deployment `my-app-two` to coexist with `my-app` for the demo.
+  # 🧠 Why it matters: same-namespace objects need unique names — collision = `AlreadyExists` error.
+  # 🌍 DevOps/Cloud: in production this would be one named workload, not two parallel demos.
+
+  labels:
+    app: my-app-two
+    # ✅ What it does: tags the Deployment with `app=my-app-two`.
+    # 🧠 Why it matters: labels are how Services / NetworkPolicies discover related objects.
+    # 🌍 DevOps/Cloud: standard `app=<name>` convention used by all fleet tooling.
+
+spec:
+  replicas: 1
+  # ✅ What it does: runs a single pod replica.
+  # 🧠 Why it matters: 1 replica is fine for a demo; production should be ≥2 (Module 22 BP7).
+  # 🌍 DevOps/Cloud: real HA needs ≥2 replicas across different nodes.
+
+  selector:
+    matchLabels:
+      app: my-app-two
+      # ✅ What it does: tells the Deployment which Pods belong to it.
+      # 🧠 Why it matters: must match the template label below or pods never get adopted.
+      # 🌍 DevOps/Cloud: selectors are immutable — changing requires delete + recreate.
+
+  template:
+    metadata:
+      labels:
+        app: my-app-two
+        # ✅ What it does: stamps every Pod with `app=my-app-two`.
+        # 🧠 Why it matters: must match `spec.selector.matchLabels` above (and any Service selector).
+        # 🌍 DevOps/Cloud: the common thread tying Deployment → Pod → Service.
+
+    spec:
+      imagePullSecrets:
+      - name: my-registry-key
+        # ✅ What it does: tells the kubelet to use the `my-registry-key` Secret when pulling images.
+        # 🧠 Why it matters: this is the ONLY way to pull private-registry images — no Secret = no pull.
+        # 🌍 DevOps/Cloud: each Pod can list multiple Secrets here for multi-registry workloads.
+
+      containers:
+      - name: my-app-two
+        # ✅ What it does: names the container inside the Pod (used by `kubectl logs/exec`).
+        # 🧠 Why it matters: with multi-container Pods you target a container by this name.
+        # 🌍 DevOps/Cloud: convention is to match the Deployment name for single-container Pods.
+
+        image: 770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app:1.2
+        # ✅ What it does: pulls `my-app:1.2` from private AWS ECR using the Secret above.
+        # 🧠 Why it matters: the registry hostname in the image MUST match the `--docker-server` used when creating the Secret.
+        # 🌍 DevOps/Cloud: pinned tag (`:1.2`) honors Module 22 BP1 — no floating `:latest`.
+
+        imagePullPolicy: Always
+        # ✅ What it does: forces the kubelet to re-pull the image every time the Pod starts.
+        # 🧠 Why it matters: ECR tokens are short-lived (12h) — `Always` ensures Pods re-auth on restart.
+        # 🌍 DevOps/Cloud: default policy is `IfNotPresent` for tagged images and `Always` for `:latest`. Explicit `Always` is safer for ECR.
+
+        ports:
+        - containerPort: 3000
+          # ✅ What it does: declares the container listens on TCP 3000.
+          # 🧠 Why it matters: metadata only — actual bind is done by the app inside the container.
+          # 🌍 DevOps/Cloud: documenting ports here helps Service.targetPort + NetworkPolicy authoring.

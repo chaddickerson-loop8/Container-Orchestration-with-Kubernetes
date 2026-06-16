@@ -1,0 +1,66 @@
+# Module 17 Step 3 — Deployment WITHOUT `imagePullSecrets`.
+# Intentional failure-mode demo: kubelet has no ECR credentials and the pod
+# stays stuck in `ImagePullBackOff` / `ErrImagePull`. See
+# `my-app-deployment-two.yaml` for the working variant that references the
+# `my-registry-key` Secret created in Step 2.
+
+apiVersion: apps/v1
+# ✅ What it does: pins this manifest to the apps/v1 API group (GA Deployment).
+# 🧠 Why it matters: apps/v1 is the only group on modern K8s that supports Deployments.
+# 🌍 DevOps/Cloud: identical group across EKS / GKE / AKS / DOKS / Minikube.
+
+kind: Deployment
+# ✅ What it does: declares this object as a Deployment (rolling-update-capable Pod controller).
+# 🧠 Why it matters: Deployments add ReplicaSet management and revision history Pods don't have.
+# 🌍 DevOps/Cloud: the standard stateless-workload primitive — what every CD pipeline targets.
+
+metadata:
+  name: my-app
+  # ✅ What it does: names the Deployment `my-app` in the default namespace.
+  # 🧠 Why it matters: kubectl, logs, rollout, and Services all target the object by this name.
+  # 🌍 DevOps/Cloud: must be DNS-1123 (lowercase + hyphens) since names become DNS labels.
+
+  labels:
+    app: my-app
+    # ✅ What it does: tags the Deployment object with `app=my-app`.
+    # 🧠 Why it matters: labels are how Services and NetworkPolicies discover related objects.
+    # 🌍 DevOps/Cloud: `app=<name>` is the universal convention used by every fleet/observability tool.
+
+spec:
+  replicas: 1
+  # ✅ What it does: runs a single pod replica.
+  # 🧠 Why it matters: 1 replica is fine for a demo; production should be ≥2 (Module 22 BP7).
+  # 🌍 DevOps/Cloud: real HA needs ≥2 replicas across different nodes for survivability.
+
+  selector:
+    matchLabels:
+      app: my-app
+      # ✅ What it does: tells the Deployment which Pods belong to it (label match).
+      # 🧠 Why it matters: selector mismatch is the classic "Deployment runs but no pods appear" footgun.
+      # 🌍 DevOps/Cloud: selectors are immutable after creation — changing requires delete + recreate.
+
+  template:
+    metadata:
+      labels:
+        app: my-app
+        # ✅ What it does: stamps every Pod the Deployment creates with `app=my-app`.
+        # 🧠 Why it matters: must match `spec.selector.matchLabels` above AND any Service selector.
+        # 🌍 DevOps/Cloud: this label is the single common thread tying Deployment → Pod → Service.
+
+    spec:
+      containers:
+      - name: my-app
+        # ✅ What it does: names the container inside the Pod.
+        # 🧠 Why it matters: used by `kubectl logs/exec` to target a specific container in multi-container Pods.
+        # 🌍 DevOps/Cloud: convention is to match the Deployment name for single-container Pods.
+
+        image: 770535378489.dkr.ecr.us-east-1.amazonaws.com/my-app:1.2
+        # ✅ What it does: pulls `my-app:1.2` from the private AWS ECR repo.
+        # 🧠 Why it matters: without `imagePullSecrets` the kubelet has no auth → `ImagePullBackOff`.
+        # 🌍 DevOps/Cloud: pinned tag (`:1.2`, not `:latest`) honors Module 22 BP1 — reproducible builds.
+
+        ports:
+        - containerPort: 3000
+          # ✅ What it does: declares the container listens on TCP 3000.
+          # 🧠 Why it matters: metadata only — actual bind is done by the app inside the container.
+          # 🌍 DevOps/Cloud: documenting ports here helps Service.targetPort + NetworkPolicy authoring.
